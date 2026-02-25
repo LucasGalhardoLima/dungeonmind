@@ -50,5 +50,8 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 
+# Supabase CLI
+supabase/.temp/
+
 # Temporary
 *.tmp

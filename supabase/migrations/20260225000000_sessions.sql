@@ -14,13 +14,21 @@ CREATE TABLE IF NOT EXISTS multiplayer_sessions (
 
 -- Session players junction table
 CREATE TABLE IF NOT EXISTS session_players (
-  session_id UUID REFERENCES multiplayer_sessions(id) ON DELETE CASCADE,
+  session_code TEXT NOT NULL REFERENCES multiplayer_sessions(session_code) ON DELETE CASCADE,
   player_id TEXT NOT NULL,
   player_name TEXT NOT NULL,
+  is_host BOOLEAN DEFAULT false,
   character_data JSONB,
   is_connected BOOLEAN DEFAULT false,
   joined_at TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (session_id, player_id)
+  PRIMARY KEY (session_code, player_id)
+);
+
+-- Push notification tokens
+CREATE TABLE IF NOT EXISTS push_tokens (
+  player_id TEXT PRIMARY KEY,
+  expo_push_token TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Index for session code lookup

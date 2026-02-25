@@ -53,8 +53,7 @@ export default function RootLayout() {
   // the actual GeistPixel OTF is added to assets/fonts/.
   const [fontsLoaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-    // TODO: Replace with GeistPixel.otf once the font file is obtained
-    // GeistPixel: require('../assets/fonts/GeistPixel.otf'),
+    GeistPixel: require('../assets/fonts/GeistPixel-Square.otf'),
   });
 
   const db = useMemo(() => getDatabase(), []);
