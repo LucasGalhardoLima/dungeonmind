@@ -81,11 +81,8 @@ export function getAbilityModifier(score: number): number {
 
 export const ASI_LEVELS: ReadonlySet<number> = new Set([4, 8, 12, 16, 19]);
 
-// ---------------------------------------------------------------------------
-// Armor Category
-// ---------------------------------------------------------------------------
-
-export type ArmorCategory = 'light' | 'medium' | 'heavy';
+// ArmorCategory imported from types/entities.ts
+export type { ArmorCategory } from '../types/entities';
 
 // ---------------------------------------------------------------------------
 // Class Ability Template

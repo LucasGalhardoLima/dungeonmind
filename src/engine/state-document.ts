@@ -21,6 +21,13 @@ export function createInitialStateDocument(
     inventory: character.inventory.map((item) => item.name),
     portrait_prompt: character.portrait_prompt,
     backstory_summary: character.backstory_summary,
+    armor_class: character.armor_class,
+    gold: character.gold,
+    class_abilities: character.class_abilities.map((a) => ({
+      name: a.name,
+      current: a.resource_current,
+      max: a.resource_max,
+    })),
   };
 
   return {

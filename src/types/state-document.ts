@@ -19,6 +19,11 @@ export interface StateCharacter {
   inventory: string[];
   portrait_prompt: string;
   backstory_summary: string;
+  armor_class: number;
+  gold: number;
+  class_abilities: Array<{ name: string; current: number; max: number }>;
+  spell_slots_remaining?: number[];
+  death_saves?: { active: boolean; successes: number; failures: number };
 }
 
 export interface StateEvent {

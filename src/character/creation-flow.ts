@@ -224,6 +224,9 @@ export function getCreationSystemPrompt(world: string, adventureType: AdventureT
     '- Use linguagem evocativa, poética e imersiva.',
     '- O nome do personagem é perguntado APENAS no final, após toda a personalidade estar definida.',
     '- Nunca quebre o personagem — você é o narrador, não uma IA.',
+    '- Mantenha respostas CURTAS: 2-4 frases narrativas + a pergunta. Maximo 150 palavras por mensagem.',
+    '- Exceção: na fase de sugestão e completo, pode ser mais extenso para apresentar o personagem.',
+    '- NUNCA repita informações que o jogador já forneceu — vá direto à próxima pergunta.',
     '',
     '## Contexto do Mundo',
     worldDescription,
@@ -268,6 +271,25 @@ export function getCreationSystemPrompt(world: string, adventureType: AdventureT
 }
 
 // ---------------------------------------------------------------------------
+// Token budget per phase
+// ---------------------------------------------------------------------------
+
+/**
+ * Return the max_tokens budget for a given creation phase.
+ * Conversational phases get a tight limit to enforce brevity;
+ * suggestion/complete need room for the [CHAR_DATA] JSON block.
+ */
+export function getMaxTokensForPhase(phase: CreationPhase): number {
+  switch (phase) {
+    case 'suggestion':
+    case 'complete':
+      return 1200;
+    default:
+      return 900;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Public functions
 // ---------------------------------------------------------------------------
 
@@ -297,7 +319,7 @@ export function processExchange(
   playerInput: string,
 ): { updatedState: CreationState; aiPrompt: string } {
   // For the very first message, we don't have player input
-  const isFirstMessage = state.phase === 'greeting' && state.exchangeCount === 0;
+  const isFirstMessage = state.phase === 'greeting' && state.exchangeCount === 0 && state.conversationHistory.length === 0;
 
   // Build the updated conversation history
   const updatedHistory = isFirstMessage
@@ -509,6 +531,15 @@ export function buildCharacterFromCreation(
     backstory_summary: data.backstory_summary,
     narrative_description: data.narrative_description,
     xp: 0,
+    armor_class: 10 + Math.floor((data.stats.dex - 10) / 2), // Base AC: 10 + DEX mod
+    gold: 0,
+    hit_dice_total: 1,
+    hit_dice_spent: 0,
+    class_abilities: [],
+    spell_slots: null,
+    cantrips: [],
+    known_spells: [],
+    concentrating_on: null,
   };
 }
 

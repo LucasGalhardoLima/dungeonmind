@@ -72,6 +72,15 @@ export interface Character {
   backstory_summary: string;
   narrative_description: string;
   xp: number;
+  armor_class: number;
+  gold: number;
+  hit_dice_total: number;
+  hit_dice_spent: number;
+  class_abilities: ClassAbility[];
+  spell_slots: SpellSlots | null;
+  cantrips: string[];
+  known_spells: string[];
+  concentrating_on: string | null;
   created_at: string;
 }
 
@@ -84,10 +93,54 @@ export interface CharacterStats {
   cha: number;
 }
 
+export type ItemType = 'weapon' | 'armor' | 'shield' | 'consumable' | 'gear' | 'currency';
+export type DamageType =
+  | 'slashing'
+  | 'piercing'
+  | 'bludgeoning'
+  | 'fire'
+  | 'cold'
+  | 'lightning'
+  | 'radiant'
+  | 'necrotic'
+  | 'force'
+  | 'psychic'
+  | 'poison'
+  | 'acid'
+  | 'thunder';
+export type ArmorCategory = 'light' | 'medium' | 'heavy';
+
 export interface InventoryItem {
   name: string;
   quantity: number;
   description?: string;
+  type?: ItemType;
+  damage_dice?: string;
+  damage_type?: DamageType;
+  properties?: string[];
+  armor_base?: number;
+  armor_category?: ArmorCategory;
+  effect?: string;
+  value_gp?: number;
+}
+
+export interface ClassAbility {
+  name: string;
+  description: string;
+  resource_name: string | null;
+  resource_max: number;
+  resource_current: number;
+}
+
+export interface SpellSlots {
+  max: number[];
+  current: number[];
+}
+
+export interface DeathSaves {
+  active: boolean;
+  successes: number;
+  failures: number;
 }
 
 export interface Session {

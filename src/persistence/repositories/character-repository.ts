@@ -2,7 +2,9 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import type {
   Character,
   CharacterStats,
+  ClassAbility,
   InventoryItem,
+  SpellSlots,
 } from '../../types/entities';
 import { generateId, nowISO } from '../database';
 
@@ -13,8 +15,8 @@ export class CharacterRepository {
     const id = generateId();
     const now = nowISO();
     this.db.runSync(
-      `INSERT INTO character (id, campaign_id, player_id, name, class, race, level, hp_current, hp_max, stats, inventory, saving_throws, skills, portrait_path, portrait_prompt, portrait_seed, backstory, backstory_summary, narrative_description, xp, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO character (id, campaign_id, player_id, name, class, race, level, hp_current, hp_max, stats, inventory, saving_throws, skills, portrait_path, portrait_prompt, portrait_seed, backstory, backstory_summary, narrative_description, xp, armor_class, gold, hit_dice_total, hit_dice_spent, class_abilities, spell_slots, cantrips, known_spells, concentrating_on, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         character.campaign_id,
@@ -36,6 +38,15 @@ export class CharacterRepository {
         character.backstory_summary,
         character.narrative_description,
         character.xp,
+        character.armor_class,
+        character.gold,
+        character.hit_dice_total,
+        character.hit_dice_spent,
+        JSON.stringify(character.class_abilities),
+        character.spell_slots ? JSON.stringify(character.spell_slots) : null,
+        JSON.stringify(character.cantrips),
+        JSON.stringify(character.known_spells),
+        character.concentrating_on,
         now,
       ]
     );
@@ -105,6 +116,7 @@ export class CharacterRepository {
   }
 
   private mapRow(row: Record<string, unknown>): Character {
+    const spellSlotsRaw = row['spell_slots'] as string | null;
     return {
       id: row['id'] as string,
       campaign_id: row['campaign_id'] as string,
@@ -129,6 +141,15 @@ export class CharacterRepository {
       backstory_summary: row['backstory_summary'] as string,
       narrative_description: row['narrative_description'] as string,
       xp: row['xp'] as number,
+      armor_class: row['armor_class'] as number,
+      gold: row['gold'] as number,
+      hit_dice_total: row['hit_dice_total'] as number,
+      hit_dice_spent: row['hit_dice_spent'] as number,
+      class_abilities: JSON.parse(row['class_abilities'] as string) as ClassAbility[],
+      spell_slots: spellSlotsRaw ? JSON.parse(spellSlotsRaw) as SpellSlots : null,
+      cantrips: JSON.parse(row['cantrips'] as string) as string[],
+      known_spells: JSON.parse(row['known_spells'] as string) as string[],
+      concentrating_on: row['concentrating_on'] as string | null,
       created_at: row['created_at'] as string,
     };
   }

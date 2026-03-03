@@ -2,7 +2,7 @@
 
 import type { DiceType } from './dice';
 import type { ScenePrompt } from './scene-prompt';
-import type { SceneTrigger } from './entities';
+import type { InventoryItem, SceneTrigger } from './entities';
 
 export type ChatLayer = 'in_character' | 'out_of_character';
 
@@ -116,6 +116,8 @@ export interface ParsedResponse {
     xp_delta?: number;
     inventory_add?: string[];
     inventory_remove?: string[];
+    inventory_add_typed?: InventoryItem[];
+    gold_delta?: number;
   };
   npc_updates?: Array<{
     name: string;
@@ -125,4 +127,17 @@ export interface ParsedResponse {
     anger_delta?: number;
     gratitude_delta?: number;
   }>;
+  rest?: {
+    type: 'short' | 'long';
+  };
+  spell_cast?: {
+    name: string;
+    slot_level: number;
+  };
+  quest_update?: {
+    action: 'add' | 'complete' | 'fail' | 'progress';
+    title: string;
+    description?: string;
+    giver_npc?: string;
+  };
 }
