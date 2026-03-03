@@ -46,9 +46,9 @@ export function getProficiencyBonus(level: number): number {
 export type HitDieType = 'd6' | 'd8' | 'd10' | 'd12';
 
 export const HIT_DICE: Record<string, HitDieType> = {
-  barbaro: 'd12',
+  bárbaro: 'd12',
   bardo: 'd8',
-  clerigo: 'd8',
+  clérigo: 'd8',
   druida: 'd8',
   guerreiro: 'd10',
   monge: 'd8',
@@ -107,7 +107,7 @@ export interface ClassAbilityTemplate {
 // ---------------------------------------------------------------------------
 
 export const CLASS_ABILITIES: Record<string, ClassAbilityTemplate> = {
-  barbaro: {
+  bárbaro: {
     name: 'Furia',
     description: 'Entra em furia, ganhando resistencia a dano e bonus em ataques corpo a corpo.',
     resource_name: 'Furia',
@@ -130,7 +130,7 @@ export const CLASS_ABILITIES: Record<string, ClassAbilityTemplate> = {
     recovery: 'long_rest',
     // Uses CHA modifier — handled by getClassAbilityMax
   },
-  clerigo: {
+  clérigo: {
     name: 'Canalizar Divindade',
     description:
       'Canaliza energia divina para efeitos poderosos como expulsar mortos-vivos ou habilidades de dominio.',
@@ -228,7 +228,7 @@ export const CLASS_ABILITIES: Record<string, ClassAbilityTemplate> = {
 
 export const FULL_CASTER_CLASSES: ReadonlySet<string> = new Set([
   'bardo',
-  'clerigo',
+  'clérigo',
   'druida',
   'feiticeiro',
   'mago',
