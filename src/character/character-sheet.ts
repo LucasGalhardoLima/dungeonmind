@@ -1,4 +1,4 @@
-import type { Character, InventoryItem } from '../types/entities';
+import type { Character, InventoryItem, ClassAbility, SpellSlots } from '../types/entities';
 
 // --- Narrative mode types ---
 
@@ -41,6 +41,10 @@ export interface TechnicalSheet {
   }>;
   inventory: InventoryItem[];
   xp: number;
+  armorClass: number;
+  gold: number;
+  classAbilities: ClassAbility[];
+  spellSlots: SpellSlots | null;
 }
 
 // --- Ability score mappings ---
@@ -337,5 +341,9 @@ export function formatTechnicalSheet(character: Character): TechnicalSheet {
     skills,
     inventory: character.inventory,
     xp: character.xp,
+    armorClass: character.armor_class,
+    gold: character.gold,
+    classAbilities: character.class_abilities,
+    spellSlots: character.spell_slots,
   };
 }

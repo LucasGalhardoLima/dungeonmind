@@ -7,7 +7,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Dimensions,
   StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,30 +14,28 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 
 import { useDMEngine } from '../../../src/engine/hooks/use-dm-engine';
-import { useSceneImage } from '../../../src/scene-painter/hooks/use-scene-image';
+import { stripMetadataForDisplay } from '../../../src/engine/response-parser';
 import { useSessionStore } from '../../../src/store/session-store';
 import { useCampaignStore } from '../../../src/store/campaign-store';
 import { detectShaderType } from '../../../src/scene-painter/shader-animations';
 
-import { SceneIllustration } from '../../../src/ui/SceneIllustration';
 import { NarrationBubble } from '../../../src/ui/NarrationBubble';
+import { NarrativeLoading } from '../../../src/ui/NarrativeLoading';
 import { ActionButtons } from '../../../src/ui/ActionButtons';
 import { DiceOverlay } from '../../../src/ui/DiceOverlay';
-import { ChatBubble } from '../../../src/ui/ChatBubble';
+import { DeathSaveOverlay } from '../../../src/ui/DeathSaveOverlay';
+import { AtmosphericBackground } from '../../../src/ui/AtmosphericBackground';
 import { useMultiplayerStore } from '../../../src/store/multiplayer-store';
-import { colors, typography, spacing } from '../../../src/ui/theme';
+import { useRepository } from '../../../src/persistence/hooks/use-repository';
+import { colors, spacing, typography } from '../../../src/ui/theme';
 
 import type { Exchange } from '../../../src/types/entities';
-import type { SceneTrigger } from '../../../src/types/entities';
 
 interface DisplayExchange {
   id: string;
   role: 'player' | 'dm' | 'system';
   content: string;
 }
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SCENE_HEIGHT = 200;
 
 function mapExchangeToDisplay(exchange: Exchange): DisplayExchange {
   return {
@@ -48,47 +45,11 @@ function mapExchangeToDisplay(exchange: Exchange): DisplayExchange {
   };
 }
 
-const VALID_TRIGGERS: ReadonlySet<string> = new Set<SceneTrigger>([
-  'campaign_start',
-  'location_change',
-  'encounter',
-  'reveal',
-  'cliffhanger',
-]);
-
-function isSceneTrigger(value: string): value is SceneTrigger {
-  return VALID_TRIGGERS.has(value);
-}
-
-function extractTriggerFromMetadata(metadata: string | null): SceneTrigger {
-  if (metadata === null) {
-    return 'location_change';
-  }
-  try {
-    const parsed: unknown = JSON.parse(metadata);
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      'trigger' in parsed
-    ) {
-      const record = parsed as Record<string, unknown>;
-      const trigger = record.trigger;
-      if (typeof trigger === 'string' && isSceneTrigger(trigger)) {
-        return trigger;
-      }
-    }
-  } catch {
-    // Parsing failed, use default
-  }
-  return 'location_change';
-}
-
 export default function SessionScreen() {
   const router = useRouter();
   const scrollViewRef = useRef<ScrollView>(null);
   const [inputText, setInputText] = useState('');
   const [chatLayer, setChatLayer] = useState<'in_character' | 'out_of_character'>('in_character');
-  const previousScenePromptRef = useRef<string | null>(null);
 
   // Engine hooks
   const {
@@ -97,12 +58,9 @@ export default function SessionScreen() {
     streamingText,
     isStreaming,
     diceRequest,
-    scenePrompt,
     suggestedActions,
     error,
   } = useDMEngine();
-
-  const { generateSceneImage, currentImagePath, isGenerating } = useSceneImage();
 
   // Multiplayer state
   const isMultiplayer = useMultiplayerStore((s) => s.connectionState === 'connected');
@@ -111,19 +69,32 @@ export default function SessionScreen() {
   const recentExchanges = useSessionStore((s) => s.recentExchanges);
   const selectedCampaign = useCampaignStore((s) => s.getSelectedCampaign());
 
+  // Repositories for recap
+  const repos = useRepository();
+
+  // Session recap — load the latest recap on mount
+  const [sessionRecap, setSessionRecap] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedCampaign) return;
+    const recap = repos.sessionRecaps.getLatestByCampaignId(selectedCampaign.id);
+    if (recap) setSessionRecap(recap.recap_text);
+  }, [selectedCampaign, repos]);
+
+  // Death save state from session store
+  const deathSaveState = useSessionStore((s) => s.deathSaveState);
+  const difficulty = selectedCampaign?.difficulty ?? 'standard';
+  const maxDeathFailures = difficulty === 'beginner' ? 4 : 3;
+
+  // Atmospheric background from campaign thumbnail (generated at campaign creation)
+  const backgroundPath = selectedCampaign?.thumbnail_path ?? null;
+
+  // Derive shader type from latest DM content for subtle atmosphere
+  const latestDMContent = recentExchanges.filter(e => e.role === 'dm').at(-1)?.content ?? '';
+  const shaderType = detectShaderType(streamingText || latestDMContent, '');
+
   // Map exchanges to display format
   const displayExchanges: DisplayExchange[] = recentExchanges.map(mapExchangeToDisplay);
-
-  // Derive the latest narration text for shader detection
-  const latestDMContent = recentExchanges
-    .filter((e) => e.role === 'dm')
-    .at(-1)?.content ?? '';
-
-  const campaignSetting = scenePrompt?.setting ?? '';
-  const shaderType = detectShaderType(
-    streamingText || latestDMContent,
-    campaignSetting,
-  );
 
   // Auto-scroll to bottom when exchanges change or streaming text updates
   const scrollToBottom = useCallback(() => {
@@ -134,24 +105,7 @@ export default function SessionScreen() {
     // Small delay to allow layout to settle before scrolling
     const timeout = setTimeout(scrollToBottom, 100);
     return () => clearTimeout(timeout);
-  }, [displayExchanges.length, streamingText, scrollToBottom]);
-
-  // Scene generation when scenePrompt changes
-  useEffect(() => {
-    if (scenePrompt === null) return;
-
-    const promptKey = JSON.stringify(scenePrompt);
-    if (promptKey === previousScenePromptRef.current) return;
-    previousScenePromptRef.current = promptKey;
-
-    // Find the latest DM exchange metadata to extract trigger
-    const latestDMExchange = recentExchanges
-      .filter((e) => e.role === 'dm')
-      .at(-1);
-    const trigger = extractTriggerFromMetadata(latestDMExchange?.metadata ?? null);
-
-    void generateSceneImage(scenePrompt, trigger);
-  }, [scenePrompt, recentExchanges, generateSceneImage]);
+  }, [displayExchanges.length, scrollToBottom]);
 
   // Handle sending player action
   const handleSend = useCallback(() => {
@@ -191,21 +145,17 @@ export default function SessionScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <AtmosphericBackground imagePath={backgroundPath} shaderType={shaderType} />
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        {/* Scene Illustration with character sheet button */}
-        <View style={styles.sceneContainer}>
-          <SceneIllustration
-            imagePath={currentImagePath}
-            shaderType={shaderType}
-            width={SCREEN_WIDTH}
-            height={SCENE_HEIGHT}
-          />
-
-          {/* Floating character sheet button */}
+        {/* Compact header with campaign name + character sheet button */}
+        <View style={styles.sessionHeader}>
+          <Text style={styles.campaignName} numberOfLines={1}>
+            {selectedCampaign?.name ?? 'Aventura'}
+          </Text>
           <Pressable
             style={styles.characterSheetButton}
             onPress={handleCharacterSheet}
@@ -214,13 +164,6 @@ export default function SessionScreen() {
           >
             <Text style={styles.characterSheetIcon}>{'\uD83D\uDCCB'}</Text>
           </Pressable>
-
-          {/* Scene generation indicator */}
-          {isGenerating && (
-            <View style={styles.generatingBadge}>
-              <Text style={styles.generatingText}>Gerando cena...</Text>
-            </View>
-          )}
         </View>
 
         {/* Scrollable narration area */}
@@ -232,6 +175,13 @@ export default function SessionScreen() {
           showsVerticalScrollIndicator={false}
           onContentSizeChange={scrollToBottom}
         >
+          {sessionRecap !== null && (
+            <View style={styles.recapCard}>
+              <Text style={styles.recapTitle}>Anteriormente...</Text>
+              <Text style={styles.recapText}>{sessionRecap}</Text>
+            </View>
+          )}
+
           {displayExchanges.map((exchange, index) => {
             const isLast = index === displayExchanges.length - 1;
 
@@ -265,11 +215,18 @@ export default function SessionScreen() {
             );
           })}
 
+          {/* Narrador pondera — before first visible tokens arrive */}
+          {isStreaming && stripMetadataForDisplay(streamingText).length === 0 && (
+            <View style={styles.loadingContainer}>
+              <NarrativeLoading message="O narrador pondera..." />
+            </View>
+          )}
+
           {/* Streaming text bubble */}
-          {isStreaming && streamingText.length > 0 && (
+          {isStreaming && stripMetadataForDisplay(streamingText).length > 0 && (
             <View style={styles.dmBubbleRow}>
               <NarrationBubble
-                text={streamingText}
+                text={stripMetadataForDisplay(streamingText)}
                 isStreaming={true}
                 isLatest={true}
               />
@@ -318,7 +275,7 @@ export default function SessionScreen() {
           )}
           <TextInput
             style={styles.textInput}
-            placeholder="O que voc\u00ea faz?"
+            placeholder="O que você faz?"
             placeholderTextColor={colors.muted}
             value={inputText}
             onChangeText={setInputText}
@@ -338,19 +295,21 @@ export default function SessionScreen() {
             onPress={handleSend}
             disabled={isStreaming || inputText.trim().length === 0}
             accessibilityRole="button"
-            accessibilityLabel="Enviar a\u00e7\u00e3o"
+            accessibilityLabel="Enviar ação"
           >
-            <Text
-              style={[
-                styles.sendButtonText,
-                (isStreaming || inputText.trim().length === 0) && styles.sendButtonTextDisabled,
-              ]}
-            >
-              {'\u27A4'}
-            </Text>
+            <Text style={styles.sendButtonText}>Enviar</Text>
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Death save overlay */}
+      {deathSaveState.active && (
+        <DeathSaveOverlay
+          successes={deathSaveState.successes}
+          failures={deathSaveState.failures}
+          maxFailures={maxDeathFailures}
+        />
+      )}
 
       {/* Dice overlay modal */}
       {diceRequest !== null && (
@@ -373,38 +332,33 @@ const styles = StyleSheet.create({
   keyboardAvoid: {
     flex: 1,
   },
-  sceneContainer: {
-    position: 'relative',
-    width: SCREEN_WIDTH,
-    height: SCENE_HEIGHT,
+  sessionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    backgroundColor: 'rgba(26, 26, 46, 0.85)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  campaignName: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '600',
+    marginRight: spacing.sm,
   },
   characterSheetButton: {
-    position: 'absolute',
-    top: spacing.sm,
-    right: spacing.sm,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10,
   },
   characterSheetIcon: {
     fontSize: 20,
-  },
-  generatingBadge: {
-    position: 'absolute',
-    bottom: spacing.sm,
-    left: spacing.md,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: 8,
-  },
-  generatingText: {
-    color: colors.accent,
-    fontSize: 12,
   },
   scrollView: {
     flex: 1,
@@ -420,7 +374,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   playerBubble: {
-    backgroundColor: 'rgba(74, 44, 110, 0.3)',
+    backgroundColor: 'rgba(74, 44, 110, 0.5)',
     borderRadius: 12,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 4,
@@ -459,6 +413,7 @@ const styles = StyleSheet.create({
   actionButtonsContainer: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+    backgroundColor: 'rgba(26, 26, 46, 0.6)',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -466,6 +421,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     gap: spacing.sm,
+    backgroundColor: 'rgba(26, 26, 46, 0.9)',
   },
   textInput: {
     flex: 1,
@@ -479,25 +435,51 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
     backgroundColor: colors.accent,
-    alignItems: 'center',
+    borderRadius: 20,
+    paddingHorizontal: spacing.md,
+    height: 44,
     justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 72,
   },
   sendButtonPressed: {
     opacity: 0.8,
   },
   sendButtonDisabled: {
-    opacity: 0.4,
+    opacity: 0.6,
   },
   sendButtonText: {
     color: colors.background,
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
   },
-  sendButtonTextDisabled: {
-    opacity: 1,
+  loadingContainer: {
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  recapCard: {
+    backgroundColor: 'rgba(74, 44, 110, 0.25)',
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
+  },
+  recapTitle: {
+    color: colors.accent,
+    fontSize: 15,
+    fontWeight: '700',
+    fontFamily: typography.heading,
+    fontStyle: 'italic',
+    marginBottom: spacing.xs,
+  },
+  recapText: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 22,
+    fontFamily: typography.body,
+    fontStyle: 'italic',
   },
 });

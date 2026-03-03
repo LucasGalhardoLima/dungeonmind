@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, router } from 'expo-router';
 import { useCampaignStore } from '../../../src/store/campaign-store';
 import { useSessionStore } from '../../../src/store/session-store';
 import { useRepository } from '../../../src/persistence/hooks/use-repository';
@@ -35,8 +35,20 @@ export default function CampaignLayout() {
     const campaign = repos.campaigns.getById(id);
     if (!campaign) return;
 
-    // Load characters for this campaign
-    repos.characters.getByCampaignId(id);
+    // Check if character creation was completed
+    const characters = repos.characters.getByCampaignId(id);
+    if (characters.length === 0) {
+      // No character yet — redirect to character creation
+      router.replace({
+        pathname: '/(campaign)/create-character',
+        params: {
+          campaignId: id,
+          world: campaign.world,
+          adventureType: campaign.adventure_type,
+        },
+      });
+      return;
+    }
 
     // Load or create an active session
     let session = repos.sessions.getLatest(id);
@@ -53,7 +65,23 @@ export default function CampaignLayout() {
 
     // Load recent exchanges (last 20)
     const exchanges = repos.exchanges.getRecent(id, 20);
-    setRecentExchanges(exchanges);
+
+    // Seed the opening hook as the first DM exchange for brand-new campaigns.
+    // The hook is already player-selected narrative prose — no AI call needed.
+    let finalExchanges = exchanges;
+    if (exchanges.length === 0 && campaign.opening_hook.trim().length > 0) {
+      const hookExchange = repos.exchanges.create({
+        session_id: session.id,
+        campaign_id: id,
+        role: 'dm',
+        content: campaign.opening_hook,
+        metadata: JSON.stringify({ trigger: 'campaign_start' }),
+        sequence: 0,
+      });
+      finalExchanges = [hookExchange];
+    }
+
+    setRecentExchanges(finalExchanges);
 
     // Load latest scene image path
     const latestScene = repos.sceneImages.getLatest(id);
@@ -97,6 +125,14 @@ export default function CampaignLayout() {
         name="history"
         options={{
           title: 'Histórico',
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
+        }}
+      />
+      <Stack.Screen
+        name="quests"
+        options={{
+          title: 'Missões',
           presentation: 'modal',
           animation: 'slide_from_bottom',
         }}

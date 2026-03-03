@@ -7,7 +7,7 @@ import {
   SafeAreaView,
   StyleSheet,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 import { useCharacter } from '../../../src/character/hooks/use-character';
@@ -24,6 +24,7 @@ function formatModifierDisplay(modifier: number): string {
 
 export default function CharacterSheet() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const { character, narrativeSheet, technicalSheet, loadCharacter } =
     useCharacter();
   const [mode, setMode] = useState<SheetMode>('narrative');
@@ -56,6 +57,18 @@ export default function CharacterSheet() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Close button */}
+      <View style={styles.headerRow}>
+        <Pressable
+          style={styles.closeButton}
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Fechar ficha"
+        >
+          <Text style={styles.closeButtonText}>Fechar</Text>
+        </Pressable>
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -102,7 +115,7 @@ export default function CharacterSheet() {
                   : styles.toggleTextInactive,
               ]}
             >
-              T\u00e9cnica
+              Técnica
             </Text>
           </Pressable>
         </View>
@@ -176,7 +189,7 @@ function NarrativeContent({ narrativeSheet }: NarrativeContentProps) {
 
       {/* Background */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Hist\u00f3ria</Text>
+        <Text style={styles.sectionTitle}>História</Text>
         <Text style={styles.narrativeText}>{narrativeSheet.background}</Text>
       </View>
     </View>
@@ -195,7 +208,7 @@ function TechnicalContent({ technicalSheet }: TechnicalContentProps) {
   if (!technicalSheet) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.loadingText}>Carregando ficha t\u00e9cnica...</Text>
+        <Text style={styles.loadingText}>Carregando ficha técnica...</Text>
       </View>
     );
   }
@@ -211,7 +224,7 @@ function TechnicalContent({ technicalSheet }: TechnicalContentProps) {
       <View style={styles.section}>
         <Text style={styles.characterName}>{technicalSheet.header.name}</Text>
         <Text style={styles.characterSubtitle}>
-          {technicalSheet.header.race} {technicalSheet.header.class} — N\u00edvel{' '}
+          {technicalSheet.header.race} {technicalSheet.header.class} — Nível{' '}
           {technicalSheet.header.level}
         </Text>
       </View>
@@ -263,6 +276,14 @@ function TechnicalContent({ technicalSheet }: TechnicalContentProps) {
         </View>
       </View>
 
+      {/* AC Display */}
+      <View style={styles.section}>
+        <View style={styles.statRow}>
+          <Text style={styles.statLabel}>CA (Classe de Armadura)</Text>
+          <Text style={styles.statValue}>{technicalSheet.armorClass}</Text>
+        </View>
+      </View>
+
       {/* HP Bar */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Pontos de Vida</Text>
@@ -283,7 +304,7 @@ function TechnicalContent({ technicalSheet }: TechnicalContentProps) {
 
       {/* Saving Throws */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Testes de Resist\u00eancia</Text>
+        <Text style={styles.sectionTitle}>Testes de Resistência</Text>
         {technicalSheet.savingThrows.map((save) => (
           <View key={save.name} style={styles.listRow}>
             <View style={styles.listRowLeft}>
@@ -313,7 +334,7 @@ function TechnicalContent({ technicalSheet }: TechnicalContentProps) {
 
       {/* Skills */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Per\u00edcias</Text>
+        <Text style={styles.sectionTitle}>Perícias</Text>
         {technicalSheet.skills.map((skill) => (
           <View key={skill.name} style={styles.listRow}>
             <View style={styles.listRowLeft}>
@@ -341,11 +362,64 @@ function TechnicalContent({ technicalSheet }: TechnicalContentProps) {
         ))}
       </View>
 
+      {/* Class Abilities */}
+      {technicalSheet.classAbilities.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Habilidades de Classe</Text>
+          {technicalSheet.classAbilities.map((ability, idx) => (
+            <View key={idx} style={styles.abilityItemRow}>
+              <View style={styles.abilityItemLeft}>
+                <Text style={styles.abilityItemName}>{ability.name}</Text>
+                <Text style={styles.abilityItemDesc}>{ability.description}</Text>
+              </View>
+              {ability.resource_max > 0 && (
+                <Text style={styles.abilityItemUses}>
+                  {ability.resource_current}/{ability.resource_max}
+                </Text>
+              )}
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Spell Slots */}
+      {technicalSheet.spellSlots && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Slots de Magia</Text>
+          <View style={styles.spellSlotsRow}>
+            {technicalSheet.spellSlots.max.map((max, idx) =>
+              max > 0 ? (
+                <View key={idx} style={styles.slotGroup}>
+                  <Text style={styles.slotLevel}>Nv {idx + 1}</Text>
+                  <View style={styles.slotPips}>
+                    {Array.from({ length: max }).map((_, pip) => (
+                      <View
+                        key={pip}
+                        style={[
+                          styles.slotPip,
+                          pip < (technicalSheet.spellSlots?.current[idx] ?? 0) && styles.slotPipFilled,
+                        ]}
+                      />
+                    ))}
+                  </View>
+                </View>
+              ) : null,
+            )}
+          </View>
+        </View>
+      )}
+
       {/* Inventory */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Invent\u00e1rio</Text>
+        <Text style={styles.sectionTitle}>Inventário</Text>
+        {technicalSheet.gold > 0 && (
+          <View style={styles.goldRow}>
+            <Text style={styles.goldLabel}>Ouro</Text>
+            <Text style={styles.goldValue}>{technicalSheet.gold} PO</Text>
+          </View>
+        )}
         {technicalSheet.inventory.length === 0 ? (
-          <Text style={styles.emptyText}>Nenhum item no invent\u00e1rio.</Text>
+          <Text style={styles.emptyText}>Nenhum item no inventário.</Text>
         ) : (
           technicalSheet.inventory.map((item, index) => (
             <View key={`${item.name}-${index}`} style={styles.inventoryRow}>
@@ -358,7 +432,7 @@ function TechnicalContent({ technicalSheet }: TechnicalContentProps) {
 
       {/* XP */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Experi\u00eancia</Text>
+        <Text style={styles.sectionTitle}>Experiência</Text>
         <Text style={styles.xpText}>{technicalSheet.xp} XP</Text>
       </View>
     </View>
@@ -392,6 +466,23 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 16,
     fontFamily: typography.body,
+  },
+
+  // Header
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+  },
+  closeButton: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+  },
+  closeButtonText: {
+    color: colors.accent,
+    fontSize: 16,
+    fontFamily: typography.heading,
   },
 
   // Toggle
@@ -593,6 +684,105 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: typography.body,
     fontStyle: 'italic',
+  },
+
+  // AC / Stat row
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: SURFACE_COLOR,
+    borderRadius: 8,
+    padding: spacing.md,
+  },
+  statLabel: {
+    color: colors.text,
+    fontSize: 15,
+    fontFamily: typography.body,
+  },
+  statValue: {
+    color: colors.accent,
+    fontSize: 22,
+    fontFamily: typography.heading,
+  },
+
+  // Gold
+  goldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  goldLabel: {
+    color: colors.accent,
+    fontSize: 14,
+    fontFamily: typography.heading,
+  },
+  goldValue: {
+    color: colors.accent,
+    fontSize: 14,
+    fontFamily: typography.heading,
+  },
+
+  // Class Abilities
+  abilityItemRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  abilityItemLeft: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  abilityItemName: {
+    color: colors.text,
+    fontSize: 14,
+    fontFamily: typography.heading,
+    marginBottom: 2,
+  },
+  abilityItemDesc: {
+    color: colors.muted,
+    fontSize: 12,
+    fontFamily: typography.body,
+  },
+  abilityItemUses: {
+    color: colors.accent,
+    fontSize: 14,
+    fontFamily: typography.heading,
+  },
+
+  // Spell Slots
+  spellSlotsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
+  slotGroup: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  slotLevel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontFamily: typography.heading,
+  },
+  slotPips: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  slotPip: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: colors.accent,
+  },
+  slotPipFilled: {
+    backgroundColor: colors.accent,
   },
 
   // XP
