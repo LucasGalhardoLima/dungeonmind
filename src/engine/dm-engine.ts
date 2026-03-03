@@ -17,6 +17,10 @@ export interface DMEngineInput {
   recentExchanges: Exchange[];
   playerAction: string;
   includeRulesReference?: boolean;
+  activeQuests?: Array<{ title: string; status: string; description: string }>;
+  recentDecisions?: Array<{ description: string; consequence: string }>;
+  npcInteractionHistory?: Record<string, string[]>;
+  deathSaveState?: { active: boolean; successes: number; failures: number };
 }
 
 export interface DMEngineCallbacks {

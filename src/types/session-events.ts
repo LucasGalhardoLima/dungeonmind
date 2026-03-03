@@ -140,4 +140,5 @@ export interface ParsedResponse {
     description?: string;
     giver_npc?: string;
   };
+  gold_delta?: number;
 }

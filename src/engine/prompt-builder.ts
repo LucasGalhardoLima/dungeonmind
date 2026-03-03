@@ -15,6 +15,10 @@ export interface PromptBuilderInput {
   recentExchanges: Exchange[];
   playerAction: string;
   includeRulesReference?: boolean;
+  activeQuests?: Array<{ title: string; status: string; description: string }>;
+  recentDecisions?: Array<{ description: string; consequence: string }>;
+  npcInteractionHistory?: Record<string, string[]>;
+  deathSaveState?: { active: boolean; successes: number; failures: number };
 }
 
 export interface AssembledPrompt {
@@ -164,7 +168,7 @@ function buildDMPersona(matureContent: boolean, difficulty: Difficulty): string 
     ``,
     `### Formato de Resposta`,
     `- Responda sempre em pt-BR.`,
-    `- Após a narração, forneça 2–4 sugestões contextuais de ação.`,
+    `- NÃO inclua sugestões de ação no texto da narração. As ações devem aparecer APENAS no campo "suggested_actions" do bloco [DM_DATA].`,
     `- Ao final de TODA resposta, inclua um bloco de dados estruturado no formato:`,
     ``,
     `\`\`\``,
@@ -174,7 +178,11 @@ function buildDMPersona(matureContent: boolean, difficulty: Difficulty): string 
     `  "scene_change": null | { "new_location": "string", "trigger": "location_change"|"encounter"|"reveal"|"cliffhanger" },`,
     `  "suggested_actions": ["string", "string", ...],`,
     `  "character_updates": null | { "hp_change": number|null, "xp_gain": number|null, "inventory_add": string[]|null, "inventory_remove": string[]|null },`,
-    `  "npc_updates": null | [{ "name": "string", "relationship_change": "string"|null, "trust_delta": number|null, "fear_delta": number|null, "anger_delta": number|null, "gratitude_delta": number|null }]`,
+    `  "npc_updates": null | [{ "name": "string", "relationship_change": "string"|null, "trust_delta": number|null, "fear_delta": number|null, "anger_delta": number|null, "gratitude_delta": number|null }],`,
+    `  "rest": null | { "type": "short" | "long" },`,
+    `  "spell_cast": null | { "name": "string", "slot_level": number },`,
+    `  "quest_update": null | { "action": "add"|"complete"|"fail"|"progress", "title": "string", "description": "string", "giver_npc": "string"|null },`,
+    `  "gold_delta": null | number`,
     `}`,
     `[/DM_DATA]`,
     `\`\`\``,
@@ -237,22 +245,47 @@ const RELATIONSHIP_BEHAVIORS: Record<string, string> = {
 function buildStateDocumentSection(
   stateDocument: StateDocument,
   character: Character | null,
+  extra?: {
+    activeQuests?: Array<{ title: string; status: string; description: string }>;
+    recentDecisions?: Array<{ description: string; consequence: string }>;
+    npcInteractionHistory?: Record<string, string[]>;
+    deathSaveState?: { active: boolean; successes: number; failures: number };
+  },
 ): string {
-  const characterBlock = character
-    ? [
-        `### Personagem Ativo`,
-        `Nome: ${character.name}`,
-        `Classe: ${character.class} | Raça: ${character.race} | Nível: ${character.level}`,
-        `HP: ${character.hp_current}/${character.hp_max}`,
-        `Atributos: FOR ${character.stats.str} | DES ${character.stats.dex} | CON ${character.stats.con} | INT ${character.stats.int} | SAB ${character.stats.wis} | CAR ${character.stats.cha}`,
-        `Inventário: ${character.inventory.map((i) => `${i.name}${i.quantity > 1 ? ` (x${String(i.quantity)})` : ''}`).join(', ') || 'vazio'}`,
-        character.backstory_summary
-          ? `Resumo do background: ${character.backstory_summary}`
-          : '',
-      ]
+  const charLines: string[] = [];
+  if (character) {
+    charLines.push(
+      `### Personagem Ativo`,
+      `Nome: ${character.name}`,
+      `Classe: ${character.class} | Raça: ${character.race} | Nível: ${character.level}`,
+      `HP: ${character.hp_current}/${character.hp_max}`,
+      `Atributos: FOR ${character.stats.str} | DES ${character.stats.dex} | CON ${character.stats.con} | INT ${character.stats.int} | SAB ${character.stats.wis} | CAR ${character.stats.cha}`,
+      `Inventário: ${character.inventory.map((i) => `${i.name}${i.quantity > 1 ? ` (x${String(i.quantity)})` : ''}`).join(', ') || 'vazio'}`,
+    );
+    if (character.armor_class > 0) charLines.push(`CA: ${character.armor_class}`);
+    if (character.gold > 0) charLines.push(`Ouro: ${character.gold}`);
+    if (character.class_abilities.length > 0) {
+      charLines.push(
+        `Habilidades: ${character.class_abilities.map((a) =>
+          a.resource_max > 0 ? `${a.name}: ${a.resource_current}/${a.resource_max}` : a.name
+        ).join(', ')}`,
+      );
+    }
+    if (character.spell_slots) {
+      const slotsStr = character.spell_slots.max
+        .map((max, i) => (max > 0 ? `Nv${i + 1}: ${character.spell_slots!.current[i]}/${max}` : null))
         .filter(Boolean)
-        .join('\n')
-    : 'Nenhum personagem ativo.';
+        .join(', ');
+      if (slotsStr) charLines.push(`Slots de Magia: ${slotsStr}`);
+    }
+    if (character.backstory_summary) {
+      charLines.push(`Resumo do background: ${character.backstory_summary}`);
+    }
+    if (extra?.deathSaveState?.active) {
+      charLines.push(`\n⚠ MORTE IMINENTE: O personagem está a 0 HP. Salvaguardas contra a morte: ${extra.deathSaveState.successes} sucessos, ${extra.deathSaveState.failures} falhas. Peça uma rolagem de salvaguarda contra a morte (d20, CD 10) ANTES de qualquer outra ação.`);
+    }
+  }
+  const characterBlock = charLines.length > 0 ? charLines.join('\n') : 'Nenhum personagem ativo.';
 
   const worldState = stateDocument.world_state;
   const worldBlock = [
@@ -311,12 +344,48 @@ function buildStateDocumentSection(
         ].join('\n')
       : '';
 
+  // Permanent memory: quest history from ledger
+  const questHistoryBlock =
+    extra?.activeQuests && extra.activeQuests.length > 0
+      ? [
+          `### Registro de Missões (Permanente)`,
+          ...extra.activeQuests.map(
+            (q) => `- [${q.status.toUpperCase()}] ${q.title}: ${q.description}`,
+          ),
+        ].join('\n')
+      : '';
+
+  // Permanent memory: recent player decisions
+  const decisionsBlock =
+    extra?.recentDecisions && extra.recentDecisions.length > 0
+      ? [
+          `### Decisões Recentes do Jogador`,
+          ...extra.recentDecisions.map(
+            (d) => `- ${d.description} → ${d.consequence}`,
+          ),
+        ].join('\n')
+      : '';
+
+  // NPC interaction history
+  const npcHistoryBlock =
+    extra?.npcInteractionHistory && Object.keys(extra.npcInteractionHistory).length > 0
+      ? [
+          `### Histórico de Interações com NPCs`,
+          ...Object.entries(extra.npcInteractionHistory).map(
+            ([name, summaries]) => `- ${name}: ${summaries.join(' | ')}`,
+          ),
+        ].join('\n')
+      : '';
+
   return [
     `[SEÇÃO 5 — ESTADO DA CAMPANHA]`,
     characterBlock,
     worldBlock,
     npcBlock,
+    npcHistoryBlock,
     questBlock,
+    questHistoryBlock,
+    decisionsBlock,
     arcBlock,
     eventsBlock,
   ]
@@ -378,7 +447,12 @@ export function buildPrompt(input: PromptBuilderInput): AssembledPrompt {
     systemSections.push(DND_RULES_REFERENCE);
   }
 
-  systemSections.push(buildStateDocumentSection(stateDocument, character));
+  systemSections.push(buildStateDocumentSection(stateDocument, character, {
+    activeQuests: input.activeQuests,
+    recentDecisions: input.recentDecisions,
+    npcInteractionHistory: input.npcInteractionHistory,
+    deathSaveState: input.deathSaveState,
+  }));
 
   const systemPrompt = systemSections.join('\n\n');
 

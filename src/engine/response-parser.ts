@@ -9,6 +9,55 @@ import type { ScenePrompt, SceneTone } from '../types/scene-prompt';
 const DM_DATA_OPEN = '[DM_DATA]';
 const DM_DATA_CLOSE = '[/DM_DATA]';
 
+const METADATA_TAGS = [
+  { open: '[DM_DATA]', close: '[/DM_DATA]' },
+  { open: '[CHAR_DATA]', close: '[/CHAR_DATA]' },
+  { open: '[DIFFICULTY]', close: '[/DIFFICULTY]' },
+];
+
+/**
+ * Strip metadata blocks from streaming text for display purposes.
+ *
+ * Handles three states:
+ * 1. Complete blocks (e.g. `[DM_DATA]....[/DM_DATA]`) — removed entirely
+ * 2. Opened-but-unclosed blocks (e.g. `[DM_DATA]some json...`) — tag and content removed
+ * 3. Partial opening tags at the end of stream (e.g. `text[DM_DA`) — partial tag trimmed
+ */
+export function stripMetadataForDisplay(text: string): string {
+  let result = text;
+
+  for (const tag of METADATA_TAGS) {
+    // 1. Remove complete blocks
+    let openIdx = result.indexOf(tag.open);
+    while (openIdx !== -1) {
+      const closeIdx = result.indexOf(tag.close, openIdx);
+      if (closeIdx !== -1) {
+        // Complete block — remove it
+        result = result.slice(0, openIdx) + result.slice(closeIdx + tag.close.length);
+        openIdx = result.indexOf(tag.open);
+      } else {
+        // 2. Opened but unclosed — remove from open tag to end
+        result = result.slice(0, openIdx);
+        break;
+      }
+    }
+
+    // 3. Check for partial opening tags at end of text (e.g. `[DM_DA`)
+    for (let len = tag.open.length - 1; len >= 1; len--) {
+      const partial = tag.open.slice(0, len);
+      if (result.endsWith(partial)) {
+        result = result.slice(0, -len);
+        break;
+      }
+    }
+  }
+
+  // Strip trailing triple backticks (AI sometimes wraps DM_DATA in a code block)
+  result = result.replace(/```\s*$/g, '');
+
+  return result.trimEnd();
+}
+
 /**
  * Parse a full AI response to extract narration text and structured data.
  *
@@ -24,7 +73,7 @@ export function parseResponse(fullText: string): ParsedResponse {
     return { narration: fullText.trim() };
   }
 
-  const narration = fullText.slice(0, openIdx).trim();
+  const narration = fullText.slice(0, openIdx).replace(/```\s*$/g, '').trim();
   const closeIdx = fullText.indexOf(DM_DATA_CLOSE, openIdx);
 
   // Opening tag found but no closing tag — treat the rest as malformed, return narration only
@@ -92,6 +141,38 @@ export function parseResponse(fullText: string): ParsedResponse {
     }
   }
 
+  // Parse rest
+  if (raw.rest?.type === 'short' || raw.rest?.type === 'long') {
+    result.rest = { type: raw.rest.type };
+  }
+
+  // Parse spell cast
+  if (raw.spell_cast && typeof raw.spell_cast.name === 'string' && typeof raw.spell_cast.slot_level === 'number') {
+    result.spell_cast = {
+      name: raw.spell_cast.name,
+      slot_level: raw.spell_cast.slot_level,
+    };
+  }
+
+  // Parse quest update
+  if (raw.quest_update && typeof raw.quest_update.title === 'string') {
+    const validActions = new Set(['add', 'complete', 'fail', 'progress']);
+    const action = typeof raw.quest_update.action === 'string' && validActions.has(raw.quest_update.action)
+      ? raw.quest_update.action as 'add' | 'complete' | 'fail' | 'progress'
+      : 'add';
+    result.quest_update = {
+      action,
+      title: raw.quest_update.title,
+      ...(typeof raw.quest_update.description === 'string' ? { description: raw.quest_update.description } : {}),
+      ...(typeof raw.quest_update.giver_npc === 'string' ? { giver_npc: raw.quest_update.giver_npc } : {}),
+    };
+  }
+
+  // Parse gold delta
+  if (typeof raw.gold_delta === 'number') {
+    result.gold_delta = raw.gold_delta;
+  }
+
   return result;
 }
 
@@ -149,6 +230,20 @@ interface RawDMData {
     inventory_remove?: unknown[];
   };
   npc_updates?: RawNpcUpdate[];
+  rest?: {
+    type?: string;
+  };
+  spell_cast?: {
+    name?: string;
+    slot_level?: unknown;
+  };
+  quest_update?: {
+    action?: string;
+    title?: string;
+    description?: string;
+    giver_npc?: string;
+  };
+  gold_delta?: unknown;
 }
 
 interface RawNpcUpdate {

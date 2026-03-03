@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useSessionStore } from '../../store/session-store';
 import { useCampaignStore } from '../../store/campaign-store';
 import { useRepository } from '../../persistence/hooks/use-repository';
@@ -11,6 +11,12 @@ import type { ScenePrompt } from '../../types/scene-prompt';
 import type { StateDocument } from '../../types/state-document';
 import { EMPTY_STATE_DOCUMENT } from '../../types/state-document';
 import { generateId, nowISO } from '../../persistence/database';
+import { calculateLevelUp } from '../mechanics/leveling';
+import { calculateAC } from '../mechanics/ac-calculator';
+import { applyShortRest, applyLongRest } from '../mechanics/rest-recovery';
+import { castSpell, recoverAllSpellSlots } from '../mechanics/spell-slots';
+import { recoverClassAbilities } from '../mechanics/class-abilities';
+import { classifyNPCTier, getInteractionBudget } from '../mechanics/npc-tiering';
 import {
   scheduleLocalNotification,
   generateDeepLink,
@@ -51,6 +57,43 @@ export function useDMEngine(): UseDMEngineReturn {
   const addExchange = useSessionStore((s) => s.addExchange);
 
   const selectedCampaign = useCampaignStore((s) => s.getSelectedCampaign());
+
+  // Token throttle buffer: accumulate tokens and flush at ~30fps
+  const tokenBufferRef = useRef('');
+  const flushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startTokenFlush = useCallback(() => {
+    if (flushTimerRef.current !== null) return;
+    flushTimerRef.current = setInterval(() => {
+      if (tokenBufferRef.current.length > 0) {
+        const chunk = tokenBufferRef.current;
+        tokenBufferRef.current = '';
+        appendStreamingText(chunk);
+      }
+    }, 32);
+  }, [appendStreamingText]);
+
+  const stopTokenFlush = useCallback(() => {
+    if (flushTimerRef.current !== null) {
+      clearInterval(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
+    // Flush any remaining buffered tokens
+    if (tokenBufferRef.current.length > 0) {
+      const remaining = tokenBufferRef.current;
+      tokenBufferRef.current = '';
+      appendStreamingText(remaining);
+    }
+  }, [appendStreamingText]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (flushTimerRef.current !== null) {
+        clearInterval(flushTimerRef.current);
+      }
+    };
+  }, []);
 
   const sendPlayerAction = useCallback(
     async (text: string) => {
@@ -94,6 +137,34 @@ export function useDMEngine(): UseDMEngineReturn {
         };
       }
 
+      // Enrich prompt with permanent memory data
+      const activeQuests = repos.questLogs.getActive(selectedCampaign.id).map((q) => ({
+        title: q.title,
+        status: q.status,
+        description: q.description,
+      }));
+      const recentDecisions = repos.playerDecisions.getRecent(selectedCampaign.id, 3).map((d) => ({
+        description: d.description,
+        consequence: d.consequence,
+      }));
+
+      // Build NPC interaction history with tiering
+      const npcInteractionHistory: Record<string, string[]> = {};
+      for (const npc of campaignNPCs) {
+        const interactionCount = repos.npcInteractions.getCountByNPCId(npc.id);
+        const hasQuest = repos.questLogs.getActive(selectedCampaign.id).some(
+          (q) => q.giver_npc_id === npc.id,
+        );
+        const tier = classifyNPCTier(npc, interactionCount, hasQuest);
+        const budget = getInteractionBudget(tier);
+        const interactions = repos.npcInteractions.getByNPCId(npc.id, budget);
+        if (interactions.length > 0) {
+          npcInteractionHistory[npc.name] = interactions.map((i) => i.summary);
+        }
+      }
+
+      startTokenFlush();
+
       await sendAction(
         {
           campaign: selectedCampaign,
@@ -101,13 +172,23 @@ export function useDMEngine(): UseDMEngineReturn {
           stateDocument: stateDoc,
           recentExchanges,
           playerAction: text,
+          activeQuests,
+          recentDecisions,
+          npcInteractionHistory,
         },
         {
           onToken(token: string) {
-            appendStreamingText(token);
+            tokenBufferRef.current += token;
           },
           onComplete(response: ParsedResponse) {
-            // Save DM exchange to SQLite
+            // 1. Flush remaining buffered tokens and stop the timer
+            stopTokenFlush();
+
+            // 2. Set streaming text to final clean narration so the streaming
+            //    bubble matches the permanent bubble (no visible content change)
+            setStreamingText(response.narration);
+
+            // 3. Save DM exchange and add to store — permanent bubble appears
             const dmSequence = repos.exchanges.getNextSequence(activeSession.id);
             const dmExchange = repos.exchanges.create({
               session_id: activeSession.id,
@@ -186,7 +267,117 @@ export function useDMEngine(): UseDMEngineReturn {
               }
             }
 
+            // Apply rest
+            if (response.rest && character) {
+              const restResult = response.rest.type === 'long'
+                ? applyLongRest(character)
+                : applyShortRest(character);
+              repos.characters.updateHP(character.id, restResult.newHPCurrent, character.hp_max);
+              repos.characters.updateHitDice(character.id, character.hit_dice_total, restResult.newHitDiceSpent);
+              if (restResult.spellSlotsRecovered && character.spell_slots) {
+                repos.characters.updateSpellSlots(character.id, recoverAllSpellSlots(character.spell_slots));
+              }
+              const recoveredAbilities = recoverClassAbilities(character.class_abilities, character.class, response.rest.type);
+              repos.characters.updateClassAbilities(character.id, recoveredAbilities);
+              const restSeq = repos.exchanges.getNextSequence(activeSession.id);
+              repos.exchanges.create({
+                session_id: activeSession.id,
+                campaign_id: selectedCampaign.id,
+                role: 'system',
+                content: restResult.summary,
+                metadata: JSON.stringify({ type: 'rest', rest_type: response.rest.type }),
+                sequence: restSeq,
+              });
+            }
+
+            // Apply spell cast
+            if (response.spell_cast && character?.spell_slots) {
+              const updatedSlots = castSpell(character.spell_slots, response.spell_cast.slot_level);
+              if (updatedSlots) {
+                repos.characters.updateSpellSlots(character.id, updatedSlots);
+              }
+            }
+
+            // Apply gold delta
+            if (response.gold_delta && character) {
+              repos.characters.addGold(character.id, response.gold_delta);
+            }
+
+            // Apply quest updates
+            if (response.quest_update && activeSession) {
+              const qu = response.quest_update;
+              if (qu.action === 'add') {
+                const giverNpc = qu.giver_npc
+                  ? repos.npcs.getByName(selectedCampaign.id, qu.giver_npc)
+                  : null;
+                repos.questLogs.create({
+                  campaign_id: selectedCampaign.id,
+                  title: qu.title,
+                  description: qu.description ?? '',
+                  status: 'active',
+                  giver_npc_id: giverNpc?.id ?? null,
+                  created_session_id: activeSession.id,
+                  completed_session_id: null,
+                });
+              } else {
+                const quest = repos.questLogs.getByTitle(selectedCampaign.id, qu.title);
+                if (quest) {
+                  if (qu.action === 'complete') {
+                    repos.questLogs.updateStatus(quest.id, 'completed', activeSession.id);
+                  } else if (qu.action === 'fail') {
+                    repos.questLogs.updateStatus(quest.id, 'failed', activeSession.id);
+                  } else if (qu.action === 'progress' && qu.description) {
+                    repos.questLogs.addEvent({
+                      quest_id: quest.id,
+                      session_id: activeSession.id,
+                      description: qu.description,
+                      sequence: 0,
+                    });
+                  }
+                }
+              }
+            }
+
+            // Check for level-up after XP gain
+            if (response.character_updates?.xp_delta && character) {
+              const freshChar = repos.characters.getById(character.id);
+              if (freshChar) {
+                const levelUp = calculateLevelUp(freshChar);
+                if (levelUp) {
+                  repos.characters.updateHP(freshChar.id, freshChar.hp_current + levelUp.hpIncrease, levelUp.newHPMax);
+                  repos.characters.levelUp(freshChar.id, levelUp.newLevel, freshChar.stats);
+                  repos.characters.updateHitDice(freshChar.id, levelUp.newLevel, freshChar.hit_dice_spent);
+                  if (levelUp.newSpellSlots) {
+                    repos.characters.updateSpellSlots(freshChar.id, {
+                      max: levelUp.newSpellSlots,
+                      current: levelUp.newSpellSlots,
+                    });
+                  }
+                  const lvlSeq = repos.exchanges.getNextSequence(activeSession.id);
+                  repos.exchanges.create({
+                    session_id: activeSession.id,
+                    campaign_id: selectedCampaign.id,
+                    role: 'system',
+                    content: `Subiu para nível ${levelUp.newLevel}! HP máximo: ${levelUp.newHPMax}. Bônus de proficiência: +${levelUp.newProficiencyBonus}.`,
+                    metadata: JSON.stringify({ type: 'level_up', new_level: levelUp.newLevel }),
+                    sequence: lvlSeq,
+                  });
+                }
+              }
+            }
+
+            // Recalculate AC after inventory change
+            if ((response.character_updates?.inventory_add || response.character_updates?.inventory_remove) && character) {
+              const freshChar = repos.characters.getById(character.id);
+              if (freshChar) {
+                const acResult = calculateAC(freshChar.stats, freshChar.inventory, freshChar.class);
+                repos.characters.updateArmorClass(freshChar.id, acResult.value);
+              }
+            }
+
             repos.campaigns.touchLastPlayed(selectedCampaign.id);
+
+            // 4. Set isStreaming false LAST — streaming bubble disappears
             setIsStreaming(false);
           },
           onDiceRequest(request: DiceRequest) {
@@ -196,6 +387,7 @@ export function useDMEngine(): UseDMEngineReturn {
             setCurrentScenePrompt(prompt);
           },
           onError(error: NarrativeError) {
+            stopTokenFlush();
             errorRef.current = error;
             setIsStreaming(false);
           },
@@ -214,6 +406,8 @@ export function useDMEngine(): UseDMEngineReturn {
       setCurrentScenePrompt,
       setSuggestedActions,
       addExchange,
+      startTokenFlush,
+      stopTokenFlush,
     ]
   );
 
