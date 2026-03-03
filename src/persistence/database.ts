@@ -1,12 +1,14 @@
+import { randomUUID } from 'expo-crypto';
 import * as SQLite from 'expo-sqlite';
 import { migration001 } from './migrations/001-initial';
+import { migration002 } from './migrations/002-dnd-mechanics';
 
 interface Migration {
   version: number;
   up(db: SQLite.SQLiteDatabase): void;
 }
 
-const migrations: Migration[] = [migration001];
+const migrations: Migration[] = [migration001, migration002];
 
 const DB_NAME = 'dungeonmind.db';
 
@@ -64,7 +66,7 @@ export function closeDatabase(): void {
 }
 
 export function generateId(): string {
-  return crypto.randomUUID();
+  return randomUUID();
 }
 
 export function nowISO(): string {
