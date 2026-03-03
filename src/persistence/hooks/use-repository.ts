@@ -7,6 +7,10 @@ import { ExchangeRepository } from '../repositories/exchange-repository';
 import { SceneImageRepository } from '../repositories/scene-image-repository';
 import { NPCRepository } from '../repositories/npc-repository';
 import { NotificationLogRepository } from '../repositories/notification-log-repository';
+import { QuestLogRepository } from '../repositories/quest-log-repository';
+import { NPCInteractionRepository } from '../repositories/npc-interaction-repository';
+import { PlayerDecisionRepository } from '../repositories/player-decision-repository';
+import { SessionRecapRepository } from '../repositories/session-recap-repository';
 
 export interface Repositories {
   campaigns: CampaignRepository;
@@ -16,6 +20,10 @@ export interface Repositories {
   sceneImages: SceneImageRepository;
   npcs: NPCRepository;
   notificationLogs: NotificationLogRepository;
+  questLogs: QuestLogRepository;
+  npcInteractions: NPCInteractionRepository;
+  playerDecisions: PlayerDecisionRepository;
+  sessionRecaps: SessionRecapRepository;
 }
 
 export function createRepositories(db: SQLiteDatabase): Repositories {
@@ -27,6 +35,10 @@ export function createRepositories(db: SQLiteDatabase): Repositories {
     sceneImages: new SceneImageRepository(db),
     npcs: new NPCRepository(db),
     notificationLogs: new NotificationLogRepository(db),
+    questLogs: new QuestLogRepository(db),
+    npcInteractions: new NPCInteractionRepository(db),
+    playerDecisions: new PlayerDecisionRepository(db),
+    sessionRecaps: new SessionRecapRepository(db),
   };
 }
 

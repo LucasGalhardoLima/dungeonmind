@@ -111,6 +111,50 @@ export class CharacterRepository {
     ]);
   }
 
+  updateArmorClass(id: string, ac: number): void {
+    this.db.runSync('UPDATE character SET armor_class = ? WHERE id = ?', [ac, id]);
+  }
+
+  updateGold(id: string, gold: number): void {
+    this.db.runSync('UPDATE character SET gold = ? WHERE id = ?', [gold, id]);
+  }
+
+  addGold(id: string, delta: number): void {
+    this.db.runSync('UPDATE character SET gold = MAX(0, gold + ?) WHERE id = ?', [delta, id]);
+  }
+
+  updateHitDice(id: string, total: number, spent: number): void {
+    this.db.runSync(
+      'UPDATE character SET hit_dice_total = ?, hit_dice_spent = ? WHERE id = ?',
+      [total, spent, id],
+    );
+  }
+
+  updateClassAbilities(id: string, abilities: ClassAbility[]): void {
+    this.db.runSync('UPDATE character SET class_abilities = ? WHERE id = ?', [
+      JSON.stringify(abilities), id,
+    ]);
+  }
+
+  updateSpellSlots(id: string, slots: SpellSlots | null): void {
+    this.db.runSync('UPDATE character SET spell_slots = ? WHERE id = ?', [
+      slots ? JSON.stringify(slots) : null, id,
+    ]);
+  }
+
+  updateConcentration(id: string, spellName: string | null): void {
+    this.db.runSync('UPDATE character SET concentrating_on = ? WHERE id = ?', [
+      spellName, id,
+    ]);
+  }
+
+  updateCantripsAndSpells(id: string, cantrips: string[], knownSpells: string[]): void {
+    this.db.runSync(
+      'UPDATE character SET cantrips = ?, known_spells = ? WHERE id = ?',
+      [JSON.stringify(cantrips), JSON.stringify(knownSpells), id],
+    );
+  }
+
   delete(id: string): void {
     this.db.runSync('DELETE FROM character WHERE id = ?', [id]);
   }
