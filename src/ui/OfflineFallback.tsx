@@ -18,11 +18,11 @@ export function OfflineFallback({
     <View style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.heading}>
-          A aventura requer uma conex{'\u00e3'}o com o mundo al{'\u00e9'}m...
+          A aventura requer uma conexão com o mundo além...
         </Text>
 
         <Text style={styles.subtext}>
-          Enquanto espera, releia seu {'\u00fa'}ltimo resumo de sess{'\u00e3'}o.
+          Enquanto espera, releia seu último resumo de sessão.
         </Text>
 
         {lastSessionSummary != null && lastSessionSummary.length > 0 && (

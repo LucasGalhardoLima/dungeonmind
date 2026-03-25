@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useMemo } from 'react';
 import { AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { router } from 'expo-router';
+import { router, type RelativePathString } from 'expo-router';
 import { useRepository } from '../../persistence/hooks/use-repository';
 import { useSettingsStore } from '../../store/settings-store';
 import {
@@ -86,7 +86,7 @@ export function useNotifications(): UseNotificationsReturn {
           | undefined;
         const deepLinkUrl = data?.['deepLinkUrl'];
         if (typeof deepLinkUrl === 'string' && deepLinkUrl.length > 0) {
-          router.push(deepLinkUrl);
+          router.push(deepLinkUrl as RelativePathString);
         }
 
         // Mark notification as tapped in the log

@@ -59,7 +59,7 @@ export function HookCard({
             }),
       }}
     >
-      {/* Badge com o n\u00famero do gancho */}
+      {/* Badge com o número do gancho */}
       <View
         style={{
           position: 'absolute',

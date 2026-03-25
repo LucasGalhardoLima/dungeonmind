@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, SafeAreaView, Pressable } from 'react-native';
+import { View, Text, ScrollView, Pressable } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { AdventureTypeCard } from '../../../src/ui/AdventureTypeCard';

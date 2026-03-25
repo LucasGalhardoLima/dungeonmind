@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, SafeAreaView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Image } from 'expo-image';
 import { useRepository } from '../../../src/persistence/hooks/use-repository';
@@ -31,7 +32,7 @@ function ChapterCard({
   return (
     <View style={styles.chapterCard}>
       <Text style={styles.chapterTitle}>
-        Cap\u00edtulo {chapterNumber}
+        Capítulo {chapterNumber}
       </Text>
       <Text style={styles.chapterDate}>
         {formatDate(session.started_at)}
@@ -40,7 +41,7 @@ function ChapterCard({
       {session.summary !== null ? (
         <Text style={styles.summaryText}>{session.summary}</Text>
       ) : (
-        <Text style={styles.noSummaryText}>Resumo n\u00e3o dispon\u00edvel</Text>
+        <Text style={styles.noSummaryText}>Resumo não disponível</Text>
       )}
 
       {images.length > 0 ? (
@@ -88,7 +89,7 @@ export default function SessionHistory() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backButtonText}>{'\u2190'}</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Di\u00e1rio de Aventura</Text>
+        <Text style={styles.headerTitle}>Diário de Aventura</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -104,7 +105,7 @@ export default function SessionHistory() {
         ) : sessionsWithImages.length === 0 ? (
           <View style={styles.centered}>
             <Text style={styles.emptyText}>
-              Sua hist\u00f3ria ainda n\u00e3o come\u00e7ou...
+              Sua história ainda não começou...
             </Text>
           </View>
         ) : (

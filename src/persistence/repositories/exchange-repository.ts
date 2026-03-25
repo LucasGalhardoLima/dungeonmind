@@ -56,7 +56,9 @@ export class ExchangeRepository {
 
   getRecent(campaignId: string, limit: number = 20): Exchange[] {
     const rows = this.db.getAllSync<Record<string, unknown>>(
-      'SELECT * FROM exchange WHERE campaign_id = ? ORDER BY created_at DESC LIMIT ?',
+      `SELECT * FROM (
+         SELECT * FROM exchange WHERE campaign_id = ? ORDER BY created_at DESC LIMIT ?
+       ) sub ORDER BY created_at ASC`,
       [campaignId, limit]
     );
     return rows.map((r) => this.mapRow(r));

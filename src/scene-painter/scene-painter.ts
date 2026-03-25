@@ -4,7 +4,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Crypto from 'expo-crypto';
 import Constants from 'expo-constants';
 import type { ScenePrompt } from '../types/scene-prompt';
-import { IMAGE_CONFIG } from '../types/scene-prompt';
+import type { AdventureType, World } from '../types/entities';
+import { IMAGE_CONFIG, DEFAULT_NEGATIVE_PROMPT } from '../types/scene-prompt';
 
 const REPLICATE_API_KEY =
   Constants.expoConfig?.extra?.EXPO_PUBLIC_REPLICATE_API_KEY ??
@@ -12,8 +13,11 @@ const REPLICATE_API_KEY =
   '';
 
 const REPLICATE_API_URL = 'https://api.replicate.com/v1/predictions';
+
+// stability-ai/sdxl latest version hash
+const SDXL_VERSION = '7762fd07cf82c948538e41f63f77d685e02b063e37e496e96eefd46c929f9bdc';
 const POLL_INTERVAL_MS = 1000;
-const TIMEOUT_MS = 15000;
+const TIMEOUT_MS = 60000;
 
 type PredictionStatus = 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled';
 
@@ -52,6 +56,21 @@ export function buildSceneTextPrompt(prompt: ScenePrompt): string {
   ].join(', ');
 }
 
+const ADVENTURE_BG_PROMPTS: Record<AdventureType, string> = {
+  dungeon_crawl:
+    'pixel art scene, vast dark dungeon interior, stone corridors, flickering torches on walls, mysterious glowing runes, ancient stone pillars, cobwebs, atmospheric lighting, high fantasy, medieval architecture, torch lighting',
+  wilderness_exploration:
+    'pixel art scene, epic wilderness landscape, dense ancient forest, winding mountain path, distant peaks, golden sunlight filtering through canopy, wild untamed nature, high fantasy, medieval architecture, torch lighting',
+  political_intrigue:
+    'pixel art scene, grand medieval throne room interior, ornate tapestries, candlelit chandeliers, marble columns, stained glass windows, shadowy alcoves, opulent and mysterious, high fantasy, medieval architecture',
+  horror_survival:
+    'pixel art scene, dark cursed landscape, twisted dead trees, eerie fog, crumbling ruins, faint ghostly light, ominous sky, foreboding atmosphere, high fantasy, medieval architecture, torch lighting',
+};
+
+function buildAdventureBackgroundPrompt(_world: World, adventureType: AdventureType): string {
+  return ADVENTURE_BG_PROMPTS[adventureType];
+}
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -77,38 +96,50 @@ async function createPrediction(
   textPrompt: string,
   negativePrompt: string,
 ): Promise<ReplicatePrediction> {
-  const response = await fetch(REPLICATE_API_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${REPLICATE_API_KEY}`,
-      'Content-Type': 'application/json',
-      Prefer: 'wait',
-    },
-    body: JSON.stringify({
-      version: 'nerijs/pixel-art-xl',
-      input: {
-        prompt: textPrompt,
-        negative_prompt: negativePrompt,
-        width: IMAGE_CONFIG.width,
-        height: IMAGE_CONFIG.height,
-        scheduler: IMAGE_CONFIG.scheduler,
-        num_inference_steps: IMAGE_CONFIG.num_inference_steps,
-        guidance_scale: IMAGE_CONFIG.guidance_scale,
-        num_outputs: IMAGE_CONFIG.num_outputs,
+  const maxAttempts = 3;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const response = await fetch(REPLICATE_API_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${REPLICATE_API_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'wait',
       },
-    }),
-  });
+      body: JSON.stringify({
+        version: SDXL_VERSION,
+        input: {
+          prompt: textPrompt,
+          negative_prompt: negativePrompt,
+          width: IMAGE_CONFIG.width,
+          height: IMAGE_CONFIG.height,
+          scheduler: IMAGE_CONFIG.scheduler,
+          num_inference_steps: IMAGE_CONFIG.num_inference_steps,
+          guidance_scale: IMAGE_CONFIG.guidance_scale,
+          num_outputs: IMAGE_CONFIG.num_outputs,
+        },
+      }),
+    });
 
-  if (!response.ok) {
-    throw new Error(`Replicate API returned ${String(response.status)}`);
+    if (response.status === 429 && attempt < maxAttempts - 1) {
+      // Rate limited — wait and retry
+      await delay(10000 * (attempt + 1));
+      continue;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Replicate API returned ${String(response.status)}`);
+    }
+
+    const body: unknown = await response.json();
+    if (!isReplicatePrediction(body)) {
+      throw new Error('Invalid prediction response from Replicate API');
+    }
+
+    return body;
   }
 
-  const body: unknown = await response.json();
-  if (!isReplicatePrediction(body)) {
-    throw new Error('Invalid prediction response from Replicate API');
-  }
-
-  return body;
+  throw new Error('Replicate API rate limited after retries');
 }
 
 async function pollPrediction(predictionId: string): Promise<ReplicatePrediction> {
@@ -208,6 +239,44 @@ export async function generateScene(
     return await attemptGeneration(prompt, cacheDir);
   } catch (_retryError: unknown) {
     // Return null — the UI will show a narrative fallback
+    return null;
+  }
+}
+
+/**
+ * Generate a static background image for a campaign based on world + adventure type.
+ * Called once at campaign creation. Returns local file path or null on failure.
+ */
+export async function generateAdventureBackground(
+  world: World,
+  adventureType: AdventureType,
+  cacheDir: string,
+): Promise<string | null> {
+  const textPrompt = buildAdventureBackgroundPrompt(world, adventureType);
+  const filename = await generateFilename(textPrompt);
+  const localPath = `${cacheDir}${filename}`;
+
+  // Check cache first
+  const fileInfo = await FileSystem.getInfoAsync(localPath);
+  if (fileInfo.exists) {
+    return localPath;
+  }
+
+  await ensureCacheDir(cacheDir);
+
+  try {
+    let prediction = await createPrediction(textPrompt, DEFAULT_NEGATIVE_PROMPT);
+    if (!isPredictionTerminal(prediction.status)) {
+      prediction = await pollPrediction(prediction.id);
+    }
+    if (prediction.status !== 'succeeded' || !prediction.output || prediction.output.length === 0) {
+      return null;
+    }
+    const imageUrl = prediction.output[0];
+    if (typeof imageUrl !== 'string' || imageUrl.length === 0) return null;
+    await downloadImage(imageUrl, localPath);
+    return localPath;
+  } catch {
     return null;
   }
 }

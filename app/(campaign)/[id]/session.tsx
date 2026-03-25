@@ -4,6 +4,7 @@ import {
   Text,
   TextInput,
   Pressable,
+  TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -12,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useDMEngine } from '../../../src/engine/hooks/use-dm-engine';
 import { stripMetadataForDisplay } from '../../../src/engine/response-parser';
@@ -29,7 +31,17 @@ import { useMultiplayerStore } from '../../../src/store/multiplayer-store';
 import { useRepository } from '../../../src/persistence/hooks/use-repository';
 import { colors, spacing, typography } from '../../../src/ui/theme';
 
+import type { ImageSource } from 'expo-image';
 import type { Exchange } from '../../../src/types/entities';
+
+const WORLD_COVER_IMAGES: Record<string, ImageSource> = {
+  valdris: require('../../../assets/images/worlds/valdris.png'),
+  ferrumclave: require('../../../assets/images/worlds/ferrumclave.png'),
+  'vazio-entre-estrelas': require('../../../assets/images/worlds/vazio-entre-estrelas.png'),
+  thalassar: require('../../../assets/images/worlds/thalassar.png'),
+  'cinzas-de-umbra': require('../../../assets/images/worlds/cinzas-de-umbra.png'),
+  kenhado: require('../../../assets/images/worlds/kenhado.png'),
+};
 
 interface DisplayExchange {
   id: string;
@@ -88,6 +100,9 @@ export default function SessionScreen() {
 
   // Atmospheric background from campaign thumbnail (generated at campaign creation)
   const backgroundPath = selectedCampaign?.thumbnail_path ?? null;
+  const worldCoverFallback = selectedCampaign?.world
+    ? WORLD_COVER_IMAGES[selectedCampaign.world]
+    : undefined;
 
   // Derive shader type from latest DM content for subtle atmosphere
   const latestDMContent = recentExchanges.filter(e => e.role === 'dm').at(-1)?.content ?? '';
@@ -145,7 +160,11 @@ export default function SessionScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <AtmosphericBackground imagePath={backgroundPath} shaderType={shaderType} />
+      <AtmosphericBackground
+        imagePath={backgroundPath}
+        fallbackImage={worldCoverFallback}
+        shaderType={shaderType}
+      />
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -243,62 +262,70 @@ export default function SessionScreen() {
           )}
         </ScrollView>
 
-        {/* Action buttons */}
-        <View style={styles.actionButtonsContainer}>
+        {/* Unified bottom dock: actions + input */}
+        <View style={styles.bottomDock}>
+          {/* Action buttons */}
           <ActionButtons
             actions={suggestedActions}
             onActionPress={handleActionPress}
             disabled={isStreaming}
           />
-        </View>
 
-        {/* Text input area */}
-        <View style={styles.inputContainer}>
-          {isMultiplayer && (
-            <Pressable
-              onPress={() => {
-                setChatLayer((prev) => prev === 'in_character' ? 'out_of_character' : 'in_character');
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              }}
-              style={{
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                borderRadius: 8,
-                backgroundColor: chatLayer === 'out_of_character' ? 'rgba(128, 128, 128, 0.3)' : 'rgba(74, 44, 110, 0.3)',
-                marginRight: 8,
-              }}
+          {/* Input row */}
+          <View style={styles.inputRow}>
+            {isMultiplayer && (
+              <Pressable
+                onPress={() => {
+                  setChatLayer((prev) => prev === 'in_character' ? 'out_of_character' : 'in_character');
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: 8,
+                  backgroundColor: chatLayer === 'out_of_character' ? 'rgba(128, 128, 128, 0.3)' : 'rgba(74, 44, 110, 0.3)',
+                }}
+              >
+                <Text style={{ color: chatLayer === 'out_of_character' ? '#808080' : '#C9A84C', fontSize: 12 }}>
+                  {chatLayer === 'out_of_character' ? 'OOC' : 'IC'}
+                </Text>
+              </Pressable>
+            )}
+            <TextInput
+              style={styles.textInput}
+              placeholder="O que você faz?"
+              placeholderTextColor={colors.muted}
+              value={inputText}
+              onChangeText={setInputText}
+              editable={!isStreaming}
+              multiline
+              maxLength={500}
+              returnKeyType="send"
+              blurOnSubmit={false}
+              onSubmitEditing={handleSend}
+            />
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                (isStreaming || inputText.trim().length === 0) && styles.sendButtonDisabled,
+              ]}
+              onPress={handleSend}
+              disabled={isStreaming || inputText.trim().length === 0}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Enviar ação"
             >
-              <Text style={{ color: chatLayer === 'out_of_character' ? '#808080' : '#C9A84C', fontSize: 12 }}>
-                {chatLayer === 'out_of_character' ? 'OOC' : 'IC'}
-              </Text>
-            </Pressable>
-          )}
-          <TextInput
-            style={styles.textInput}
-            placeholder="O que você faz?"
-            placeholderTextColor={colors.muted}
-            value={inputText}
-            onChangeText={setInputText}
-            editable={!isStreaming}
-            multiline
-            maxLength={500}
-            returnKeyType="send"
-            blurOnSubmit={false}
-            onSubmitEditing={handleSend}
-          />
-          <Pressable
-            style={({ pressed }) => [
-              styles.sendButton,
-              pressed && styles.sendButtonPressed,
-              (isStreaming || inputText.trim().length === 0) && styles.sendButtonDisabled,
-            ]}
-            onPress={handleSend}
-            disabled={isStreaming || inputText.trim().length === 0}
-            accessibilityRole="button"
-            accessibilityLabel="Enviar ação"
-          >
-            <Text style={styles.sendButtonText}>Enviar</Text>
-          </Pressable>
+              <Ionicons
+                name="send"
+                size={20}
+                color={
+                  isStreaming || inputText.trim().length === 0
+                    ? colors.muted
+                    : colors.background
+                }
+              />
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
 
@@ -410,24 +437,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-  actionButtonsContainer: {
+  bottomDock: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: 'rgba(26, 26, 46, 0.6)',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
     gap: spacing.sm,
-    backgroundColor: 'rgba(26, 26, 46, 0.9)',
+    backgroundColor: 'rgba(26, 26, 46, 0.92)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(201, 168, 76, 0.15)',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   textInput: {
     flex: 1,
     backgroundColor: colors.surface,
     color: colors.text,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(201, 168, 76, 0.2)',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 4,
     fontSize: 16,
@@ -436,23 +466,15 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     backgroundColor: colors.accent,
-    borderRadius: 20,
-    paddingHorizontal: spacing.md,
+    width: 44,
     height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 72,
-  },
-  sendButtonPressed: {
-    opacity: 0.8,
+    flexShrink: 0,
   },
   sendButtonDisabled: {
-    opacity: 0.6,
-  },
-  sendButtonText: {
-    color: colors.background,
-    fontSize: 14,
-    fontWeight: '600',
+    backgroundColor: colors.surface,
   },
   loadingContainer: {
     height: 80,

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, SafeAreaView, Pressable } from 'react-native';
+import { View, Text, ScrollView, Pressable } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { HookCard } from '../../../src/ui/HookCard';
@@ -9,7 +10,9 @@ import { useRepository } from '../../../src/persistence/hooks/use-repository';
 import { useSettingsStore } from '../../../src/store/settings-store';
 import { useCampaignStore } from '../../../src/store/campaign-store';
 import { EMPTY_STATE_DOCUMENT } from '../../../src/types/state-document';
-import type { AdventureType } from '../../../src/types/entities';
+import { generateAdventureBackground } from '../../../src/scene-painter/scene-painter';
+import { getCacheDir, ensureCacheDir } from '../../../src/scene-painter/image-cache';
+import type { AdventureType, World } from '../../../src/types/entities';
 import { colors, spacing, borderRadius, typography } from '../../../src/ui/theme';
 
 const ADVENTURE_TYPE_LABELS: Record<AdventureType, string> = {
@@ -157,6 +160,24 @@ export default function OpeningHooks() {
     });
 
     addCampaign(campaign);
+
+    // Generate adventure background image in the background
+    void (async () => {
+      try {
+        await ensureCacheDir();
+        const cacheDir = getCacheDir();
+        const imagePath = await generateAdventureBackground(
+          world as World,
+          adventureType,
+          cacheDir,
+        );
+        if (imagePath) {
+          repos.campaigns.updateThumbnail(campaign.id, imagePath);
+        }
+      } catch {
+        // Non-critical — session works without a background
+      }
+    })();
 
     router.replace({
       pathname: '/(campaign)/create-character',

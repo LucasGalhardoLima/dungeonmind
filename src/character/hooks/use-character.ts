@@ -1,9 +1,9 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Character, AdventureType } from '../../types/entities';
 import type { PortraitPrompt } from '../../types/scene-prompt';
 import type { NarrativeSheet, TechnicalSheet } from '../character-sheet';
 import type { CreationState } from '../creation-flow';
-import type { StreamCallbacks } from '../../engine/streaming';
+import type { StreamCallbacks, StreamOptions } from '../../engine/streaming';
 import {
   createInitialState,
   getCreationSystemPrompt,
@@ -11,10 +11,12 @@ import {
   parseCharacterData,
   extractSuggestionFromResponse,
   buildCharacterFromCreation,
+  getMaxTokensForPhase,
 } from '../creation-flow';
 import { generatePortrait } from '../portrait-generator';
 import { formatNarrativeSheet, formatTechnicalSheet } from '../character-sheet';
 import { streamCompletion, streamCompletionGemini } from '../../engine/streaming';
+import { stripMetadataForDisplay } from '../../engine/response-parser';
 import { useRepository } from '../../persistence/hooks/use-repository';
 import { useSettingsStore } from '../../store/settings-store';
 
@@ -27,6 +29,10 @@ export interface UseCharacterReturn {
   startCreation: (campaignId: string, world: string, adventureType: AdventureType) => void;
   sendCreationResponse: (playerInput: string) => void;
   finalizeWithName: (name: string) => Promise<Character>;
+
+  // Retry
+  extractionFailed: boolean;
+  retryExtraction: () => void;
 
   // Portrait
   isGeneratingPortrait: boolean;
@@ -52,6 +58,7 @@ export function useCharacter(): UseCharacterReturn {
   const [isCreating, setIsCreating] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [extractionFailed, setExtractionFailed] = useState(false);
 
   // --- Portrait state ---
   const [isGeneratingPortrait, setIsGeneratingPortrait] = useState(false);
@@ -69,6 +76,12 @@ export function useCharacter(): UseCharacterReturn {
   const systemPromptRef = useRef('');
   const campaignIdRef = useRef('');
   const creationStateRef = useRef<CreationState>(createInitialState());
+  const lastAiPromptRef = useRef('');
+
+  // --- Token throttle buffer (same pattern as use-dm-engine.ts) ---
+  const tokenBufferRef = useRef('');
+  const flushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fullTextRef = useRef('');
 
   // Keep the ref in sync with state
   const updateCreationState = useCallback((newState: CreationState) => {
@@ -77,16 +90,55 @@ export function useCharacter(): UseCharacterReturn {
   }, []);
 
   // ---------------------------------------------------------------------------
+  // Token throttle helpers (~30fps flush)
+  // ---------------------------------------------------------------------------
+
+  const startTokenFlush = useCallback(() => {
+    if (flushTimerRef.current !== null) return;
+    flushTimerRef.current = setInterval(() => {
+      if (tokenBufferRef.current.length > 0) {
+        const chunk = tokenBufferRef.current;
+        tokenBufferRef.current = '';
+        setStreamingText((prev) => prev + chunk);
+      }
+    }, 32);
+  }, []);
+
+  const stopTokenFlush = useCallback(() => {
+    if (flushTimerRef.current !== null) {
+      clearInterval(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
+    // Flush any remaining buffered tokens
+    if (tokenBufferRef.current.length > 0) {
+      const remaining = tokenBufferRef.current;
+      tokenBufferRef.current = '';
+      setStreamingText((prev) => prev + remaining);
+    }
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (flushTimerRef.current !== null) {
+        clearInterval(flushTimerRef.current);
+      }
+    };
+  }, []);
+
+  // ---------------------------------------------------------------------------
   // Streaming helper: try Anthropic first, fallback to Gemini
   // ---------------------------------------------------------------------------
   const streamWithFallback = useCallback(
-    (systemPrompt: string, userMessage: string, callbacks: StreamCallbacks): void => {
+    (systemPrompt: string, userMessage: string, callbacks: StreamCallbacks, maxTokens?: number): void => {
+      const options: StreamOptions | undefined = maxTokens ? { maxTokens } : undefined;
+
       streamCompletion(systemPrompt, userMessage, {
         onToken: callbacks.onToken,
         onComplete: callbacks.onComplete,
         onError: () => {
           // Anthropic failed — fallback to Gemini
-          streamCompletionGemini(systemPrompt, userMessage, callbacks).catch(
+          streamCompletionGemini(systemPrompt, userMessage, callbacks, options).catch(
             (geminiError: unknown) => {
               const message =
                 geminiError instanceof Error
@@ -96,9 +148,9 @@ export function useCharacter(): UseCharacterReturn {
             },
           );
         },
-      }).catch((anthropicError: unknown) => {
+      }, options).catch(() => {
         // streamCompletion itself threw (not via onError) — try Gemini
-        streamCompletionGemini(systemPrompt, userMessage, callbacks).catch(
+        streamCompletionGemini(systemPrompt, userMessage, callbacks, options).catch(
           (geminiError: unknown) => {
             const message =
               geminiError instanceof Error
@@ -117,7 +169,12 @@ export function useCharacter(): UseCharacterReturn {
   // ---------------------------------------------------------------------------
   const handleStreamComplete = useCallback(
     (fullText: string, stateAtStreamStart: CreationState) => {
-      setIsStreaming(false);
+      // 1. Stop token flush and drain buffer
+      stopTokenFlush();
+
+      // 2. Set streaming text to match what the permanent bubble will show
+      //    (prevents visible content change during transition)
+      setStreamingText(stripMetadataForDisplay(fullText));
 
       // Add the DM response to conversation history
       const stateWithHistory: CreationState = {
@@ -133,6 +190,12 @@ export function useCharacter(): UseCharacterReturn {
       // Auto-extract suggestion data when in the suggestion phase
       if (stateAtStreamStart.phase === 'suggestion') {
         updatedState = extractSuggestionFromResponse(updatedState, fullText);
+        if (updatedState.derivedData === null) {
+          setExtractionFailed(true);
+          setError(
+            'Nao foi possivel extrair os dados do personagem. Tente novamente.',
+          );
+        }
       }
 
       // Auto-parse final character data when in the complete phase
@@ -145,12 +208,23 @@ export function useCharacter(): UseCharacterReturn {
             suggestedClass: parsedData.class,
             suggestedRace: parsedData.race,
           };
+        } else if (updatedState.derivedData === null) {
+          // Both parseCharacterData and prior suggestion extraction failed
+          setExtractionFailed(true);
+          setError(
+            'Nao foi possivel derivar os dados do personagem. Tente novamente.',
+          );
         }
+        // If parsedData is null but derivedData already exists from suggestion phase, keep it
       }
 
+      // 3. Update creation state
       updateCreationState(updatedState);
+
+      // 4. Set isStreaming false LAST — streaming bubble disappears after permanent appears
+      setIsStreaming(false);
     },
-    [updateCreationState],
+    [updateCreationState, stopTokenFlush],
   );
 
   // ---------------------------------------------------------------------------
@@ -159,6 +233,7 @@ export function useCharacter(): UseCharacterReturn {
   const startCreation = useCallback(
     (campaignId: string, world: string, adventureType: AdventureType) => {
       setError(null);
+      setExtractionFailed(false);
       setIsCreating(true);
       setStreamingText('');
       setIsStreaming(true);
@@ -173,23 +248,32 @@ export function useCharacter(): UseCharacterReturn {
       // Process the greeting exchange (empty player input for the first message)
       const { updatedState, aiPrompt } = processExchange(initialState, '');
       updateCreationState(updatedState);
+      lastAiPromptRef.current = aiPrompt;
 
       const stateSnapshot = updatedState;
+      const maxTokens = getMaxTokensForPhase(updatedState.phase);
+
+      // Reset token buffer and full text tracker
+      tokenBufferRef.current = '';
+      fullTextRef.current = '';
+      startTokenFlush();
 
       streamWithFallback(systemPrompt, aiPrompt, {
         onToken: (token: string) => {
-          setStreamingText((prev) => prev + token);
+          tokenBufferRef.current += token;
+          fullTextRef.current += token;
         },
         onComplete: (fullText: string) => {
           handleStreamComplete(fullText, stateSnapshot);
         },
         onError: (err: Error) => {
+          stopTokenFlush();
           setIsStreaming(false);
           setError(`Erro ao conectar com o narrador. Tente novamente. (${err.message})`);
         },
-      });
+      }, maxTokens);
     },
-    [updateCreationState, streamWithFallback, handleStreamComplete],
+    [updateCreationState, streamWithFallback, handleStreamComplete, startTokenFlush, stopTokenFlush],
   );
 
   // ---------------------------------------------------------------------------
@@ -198,30 +282,86 @@ export function useCharacter(): UseCharacterReturn {
   const sendCreationResponse = useCallback(
     (playerInput: string) => {
       setError(null);
+      setExtractionFailed(false);
       setStreamingText('');
       setIsStreaming(true);
 
       const currentState = creationStateRef.current;
       const { updatedState, aiPrompt } = processExchange(currentState, playerInput);
       updateCreationState(updatedState);
+      lastAiPromptRef.current = aiPrompt;
 
       const stateSnapshot = updatedState;
+      const maxTokens = getMaxTokensForPhase(updatedState.phase);
+
+      // Reset token buffer and full text tracker
+      tokenBufferRef.current = '';
+      fullTextRef.current = '';
+      startTokenFlush();
 
       streamWithFallback(systemPromptRef.current, aiPrompt, {
         onToken: (token: string) => {
-          setStreamingText((prev) => prev + token);
+          tokenBufferRef.current += token;
+          fullTextRef.current += token;
         },
         onComplete: (fullText: string) => {
           handleStreamComplete(fullText, stateSnapshot);
         },
         onError: (err: Error) => {
+          stopTokenFlush();
           setIsStreaming(false);
           setError(`Erro ao receber resposta do narrador. Tente novamente. (${err.message})`);
         },
-      });
+      }, maxTokens);
     },
-    [updateCreationState, streamWithFallback, handleStreamComplete],
+    [updateCreationState, streamWithFallback, handleStreamComplete, startTokenFlush, stopTokenFlush],
   );
+
+  // ---------------------------------------------------------------------------
+  // retryExtraction — re-attempt [CHAR_DATA] extraction after failure
+  // ---------------------------------------------------------------------------
+  const retryExtraction = useCallback(() => {
+    setError(null);
+    setExtractionFailed(false);
+    setStreamingText('');
+    setIsStreaming(true);
+
+    const currentState = creationStateRef.current;
+    const stateSnapshot = currentState;
+
+    // Build a retry prompt that explicitly asks for the [CHAR_DATA] block
+    const retryPrompt = [
+      lastAiPromptRef.current,
+      '',
+      '[INSTRUÇÃO ADICIONAL: REENVIO]',
+      'A resposta anterior não incluiu o bloco [CHAR_DATA] corretamente.',
+      'Por favor, inclua o bloco [CHAR_DATA] com todos os 11 campos obrigatórios:',
+      'class, race, stats, inventory, backstory, backstory_summary, narrative_description, portrait_prompt, saving_throws, skills.',
+      'O bloco deve estar entre [CHAR_DATA] e [/CHAR_DATA] com JSON válido.',
+    ].join('\n');
+
+    const maxTokens = 1200; // Needs room for full [CHAR_DATA] JSON
+
+    // Reset token buffer and full text tracker
+    tokenBufferRef.current = '';
+    fullTextRef.current = '';
+    startTokenFlush();
+
+    streamWithFallback(systemPromptRef.current, retryPrompt, {
+      onToken: (token: string) => {
+        tokenBufferRef.current += token;
+        fullTextRef.current += token;
+      },
+      onComplete: (fullText: string) => {
+        handleStreamComplete(fullText, stateSnapshot);
+      },
+      onError: (err: Error) => {
+        stopTokenFlush();
+        setIsStreaming(false);
+        setError(`Erro ao tentar novamente. (${err.message})`);
+      },
+    }, maxTokens);
+  }, [streamWithFallback, handleStreamComplete, startTokenFlush, stopTokenFlush]);
 
   // ---------------------------------------------------------------------------
   // finalizeWithName
@@ -365,6 +505,10 @@ export function useCharacter(): UseCharacterReturn {
     startCreation,
     sendCreationResponse,
     finalizeWithName,
+
+    // Retry
+    extractionFailed,
+    retryExtraction,
 
     // Portrait
     isGeneratingPortrait,

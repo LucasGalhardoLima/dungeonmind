@@ -1,6 +1,7 @@
 import '../global.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -86,38 +87,42 @@ export default function RootLayout() {
 
   if (!appReady) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <StatusBar style="light" />
-        <NarrativeLoading message="Preparando sua aventura..." />
-      </View>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <StatusBar style="light" />
+          <NarrativeLoading message="Preparando sua aventura..." />
+        </View>
+      </GestureHandlerRootView>
     );
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <RepositoryContext.Provider value={repos}>
-        <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.background },
-            animation: 'fade',
-          }}
-        >
-          <Stack.Screen name="(campaign)" options={{ animation: 'fade' }} />
-          <Stack.Screen
-            name="settings"
-            options={{
-              presentation: 'modal',
-              animation: 'slide_from_bottom',
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <RepositoryContext.Provider value={repos}>
+          <StatusBar style="light" />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.background },
+              animation: 'fade',
             }}
+          >
+            <Stack.Screen name="(campaign)" options={{ animation: 'fade' }} />
+            <Stack.Screen
+              name="settings"
+              options={{
+                presentation: 'modal',
+                animation: 'slide_from_bottom',
+              }}
+            />
+          </Stack>
+          <OfflineFallback
+            isOffline={isOffline}
+            onRetry={checkConnectivity}
           />
-        </Stack>
-        <OfflineFallback
-          isOffline={isOffline}
-          onRetry={checkConnectivity}
-        />
-      </RepositoryContext.Provider>
-    </QueryClientProvider>
+        </RepositoryContext.Provider>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }

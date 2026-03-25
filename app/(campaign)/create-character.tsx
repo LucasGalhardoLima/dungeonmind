@@ -5,11 +5,11 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -22,10 +22,10 @@ import Animated, {
 import { useLocalSearchParams, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useCharacter } from '../../src/character/hooks/use-character';
+import { stripMetadataForDisplay } from '../../src/engine/response-parser';
 import { CharacterPortrait } from '../../src/ui/CharacterPortrait';
 import { NarrativeLoading } from '../../src/ui/NarrativeLoading';
 import { colors, typography, spacing } from '../../src/ui/theme';
-import type { CreationPhase } from '../../src/character/creation-flow';
 import type { AdventureType } from '../../src/types/entities';
 
 // ---------------------------------------------------------------------------
@@ -44,23 +44,9 @@ type SearchParamKeys = 'campaignId' | 'world' | 'adventureType';
 // Phase metadata
 // ---------------------------------------------------------------------------
 
-const TOTAL_EXCHANGES = 7;
+const TOTAL_EXCHANGES = 8;
 
-function getPhaseIndex(phase: CreationPhase): number {
-  const phases: CreationPhase[] = [
-    'greeting',
-    'personality',
-    'skills',
-    'appearance',
-    'suggestion',
-    'naming',
-    'complete',
-  ];
-  const idx = phases.indexOf(phase);
-  return idx === -1 ? 0 : idx;
-}
-
-function getInputPlaceholder(phase: CreationPhase): string {
+function getInputPlaceholder(phase: string): string {
   switch (phase) {
     case 'naming':
       return 'Nome do personagem...';
@@ -118,15 +104,9 @@ function StreamingBubble({ text }: { text: string }) {
   );
 }
 
-function ProgressIndicator({
-  exchangeCount,
-  phase,
-}: {
-  exchangeCount: number;
-  phase: CreationPhase;
-}) {
-  const phaseIndex = getPhaseIndex(phase);
+function ProgressIndicator({ exchangeCount }: { exchangeCount: number }) {
   const displayCount = Math.min(exchangeCount + 1, TOTAL_EXCHANGES);
+  const fillRatio = Math.min(exchangeCount / TOTAL_EXCHANGES, 1);
 
   return (
     <View style={styles.progressContainer}>
@@ -137,40 +117,11 @@ function ProgressIndicator({
         <View
           style={[
             styles.progressBarFill,
-            { width: `${(phaseIndex / (TOTAL_EXCHANGES - 1)) * 100}%` },
+            { width: `${fillRatio * 100}%` },
           ]}
         />
       </View>
     </View>
-  );
-}
-
-function SendButton({
-  onPress,
-  disabled,
-}: {
-  onPress: () => void;
-  disabled: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.sendButton,
-        disabled && styles.sendButtonDisabled,
-        pressed && !disabled && styles.sendButtonPressed,
-      ]}
-    >
-      <Text
-        style={[
-          styles.sendButtonText,
-          disabled && styles.sendButtonTextDisabled,
-        ]}
-      >
-        Enviar
-      </Text>
-    </Pressable>
   );
 }
 
@@ -191,6 +142,8 @@ export default function CreateCharacter() {
     startCreation,
     sendCreationResponse,
     finalizeWithName,
+    extractionFailed,
+    retryExtraction,
     isGeneratingPortrait,
     portraitPath,
     generateCharacterPortrait,
@@ -220,9 +173,7 @@ export default function CreateCharacter() {
   }, []);
 
   const scrollToBottom = useCallback(() => {
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    scrollViewRef.current?.scrollToEnd({ animated: true });
   }, []);
 
   // -------------------------------------------------------------------------
@@ -248,8 +199,8 @@ export default function CreateCharacter() {
     if (dmMessages.length > lastDmMessageCountRef.current) {
       const latestDm = dmMessages[dmMessages.length - 1];
       if (latestDm) {
-        // Strip [CHAR_DATA]...[/CHAR_DATA] blocks from visible text
-        const cleanContent = stripCharDataBlock(latestDm.content);
+        // Strip metadata blocks from visible text
+        const cleanContent = stripMetadataForDisplay(latestDm.content);
 
         setMessages((prev) => [
           ...prev,
@@ -269,9 +220,11 @@ export default function CreateCharacter() {
     if (
       creationState.phase === 'complete' &&
       !isStreaming &&
+      !error &&
       characterName.length > 0 &&
       !isFinalizing &&
-      !character
+      !character &&
+      creationState.derivedData !== null
     ) {
       setIsFinalizing(true);
 
@@ -286,7 +239,9 @@ export default function CreateCharacter() {
     }
   }, [
     creationState.phase,
+    creationState.derivedData,
     isStreaming,
+    error,
     characterName,
     isFinalizing,
     character,
@@ -360,7 +315,7 @@ export default function CreateCharacter() {
 
   if (messages.length === 0 && !isStreaming && !streamingText) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <NarrativeLoading message="O narrador prepara sua historia..." />
       </SafeAreaView>
     );
@@ -372,7 +327,7 @@ export default function CreateCharacter() {
 
   if (showPortrait) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.portraitContainer}>
           <Animated.View entering={FadeIn.duration(600)}>
             <CharacterPortrait
@@ -391,6 +346,16 @@ export default function CreateCharacter() {
               </Text>
             </Animated.View>
           )}
+          {!isGeneratingPortrait && !portraitPath && (
+            <Animated.View entering={FadeIn.delay(500).duration(400)}>
+              <Pressable
+                style={styles.startAdventureButton}
+                onPress={() => router.replace(`/(campaign)/${campaignId}/session`)}
+              >
+                <Text style={styles.startAdventureText}>Iniciar Aventura</Text>
+              </Pressable>
+            </Animated.View>
+          )}
         </View>
       </SafeAreaView>
     );
@@ -401,17 +366,16 @@ export default function CreateCharacter() {
   // -------------------------------------------------------------------------
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        {/* Progress indicator */}
-        <ProgressIndicator
-          exchangeCount={creationState.exchangeCount}
-          phase={creationState.phase}
-        />
+        {/* Progress indicator — hidden during auto-finalize */}
+        {creationState.phase !== 'complete' && (
+          <ProgressIndicator exchangeCount={creationState.exchangeCount} />
+        )}
 
         {/* Conversation scroll area */}
         <ScrollView
@@ -433,12 +397,12 @@ export default function CreateCharacter() {
           )}
 
           {/* Streaming text (appearing word by word) */}
-          {isStreaming && streamingText.length > 0 && (
-            <StreamingBubble text={streamingText} />
+          {isStreaming && stripMetadataForDisplay(streamingText).length > 0 && (
+            <StreamingBubble text={stripMetadataForDisplay(streamingText)} />
           )}
 
-          {/* Streaming loading indicator (before any tokens arrive) */}
-          {isStreaming && streamingText.length === 0 && (
+          {/* Streaming loading indicator (before any visible tokens arrive) */}
+          {isStreaming && stripMetadataForDisplay(streamingText).length === 0 && (
             <View style={styles.loadingContainer}>
               <NarrativeLoading message="O narrador pondera..." />
             </View>
@@ -450,14 +414,18 @@ export default function CreateCharacter() {
               <Text style={styles.errorText}>{error}</Text>
             </Animated.View>
           )}
+
+          {/* Retry button when extraction fails */}
+          {extractionFailed && (
+            <Pressable onPress={retryExtraction} style={styles.retryButton}>
+              <Text style={styles.retryButtonText}>Tentar novamente</Text>
+            </Pressable>
+          )}
         </ScrollView>
 
         {/* Input area */}
         {shouldShowInput && (
-          <Animated.View
-            entering={FadeInDown.duration(300)}
-            style={styles.inputContainer}
-          >
+          <View style={styles.inputContainer}>
             <TextInput
               ref={inputRef}
               style={styles.textInput}
@@ -472,11 +440,18 @@ export default function CreateCharacter() {
               onSubmitEditing={handleSend}
               blurOnSubmit={false}
             />
-            <SendButton
+            <Pressable
               onPress={handleSend}
               disabled={isInputDisabled || inputText.trim().length === 0}
-            />
-          </Animated.View>
+              style={({ pressed }) => [
+                styles.sendButton,
+                (isInputDisabled || inputText.trim().length === 0) && styles.sendButtonDisabled,
+                pressed && !(isInputDisabled || inputText.trim().length === 0) && styles.sendButtonPressed,
+              ]}
+            >
+              <Text style={styles.sendButtonText}>Enviar</Text>
+            </Pressable>
+          </View>
         )}
 
         {/* Finalizing indicator */}
@@ -488,25 +463,6 @@ export default function CreateCharacter() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function stripCharDataBlock(text: string): string {
-  const openTag = '[CHAR_DATA]';
-  const closeTag = '[/CHAR_DATA]';
-
-  const openIdx = text.indexOf(openTag);
-  if (openIdx === -1) return text.trim();
-
-  const closeIdx = text.indexOf(closeTag, openIdx);
-  if (closeIdx === -1) return text.substring(0, openIdx).trim();
-
-  const before = text.substring(0, openIdx);
-  const after = text.substring(closeIdx + closeTag.length);
-  return (before + after).trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -625,6 +581,22 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontFamily: typography.body,
   },
+  retryButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(201, 168, 76, 0.15)',
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(201, 168, 76, 0.3)',
+  },
+  retryButtonText: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: typography.body,
+  },
 
   // Input area
   inputContainer: {
@@ -655,25 +627,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     borderRadius: 20,
     paddingHorizontal: spacing.md,
-    paddingVertical: 10,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
     minWidth: 72,
   },
   sendButtonDisabled: {
-    backgroundColor: 'rgba(201, 168, 76, 0.25)',
+    opacity: 0.4,
   },
   sendButtonPressed: {
-    backgroundColor: '#B8973F',
+    opacity: 0.8,
   },
   sendButtonText: {
     color: colors.background,
     fontSize: 14,
     fontWeight: '600',
     fontFamily: typography.body,
-  },
-  sendButtonTextDisabled: {
-    color: 'rgba(26, 26, 46, 0.5)',
   },
 
   // Portrait reveal
@@ -696,6 +665,20 @@ const styles = StyleSheet.create({
     fontFamily: typography.body,
     textAlign: 'center',
     marginTop: spacing.sm,
+  },
+  startAdventureButton: {
+    backgroundColor: colors.accent,
+    borderRadius: 20,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    marginTop: spacing.lg,
+    alignSelf: 'center',
+  },
+  startAdventureText: {
+    color: colors.background,
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: typography.body,
   },
 
   // Finalizing

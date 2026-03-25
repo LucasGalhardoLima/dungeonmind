@@ -128,7 +128,7 @@ export function CharacterPortrait({
               lineHeight: 20,
             }}
           >
-            O artista est{'\u00e1'} desenhando seu personagem...
+            O artista está desenhando seu personagem...
           </Text>
         </Animated.View>
         <View style={{ flexDirection: 'row', marginTop: 8, gap: 6 }}>
@@ -237,7 +237,7 @@ function AnimatedDot({ delay }: { delay: number }) {
 
   return (
     <Animated.View style={style}>
-      <Text style={{ color: colors.accent, fontSize: 24 }}>{'\u00b7'}</Text>
+      <Text style={{ color: colors.accent, fontSize: 24 }}>{'·'}</Text>
     </Animated.View>
   );
 }

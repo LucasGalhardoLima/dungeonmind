@@ -1,5 +1,7 @@
-import { View, Text, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import type { ImageSource } from 'expo-image';
 import { WorldCard } from '../../../src/ui/WorldCard';
 import { colors } from '../../../src/ui/theme';
 
@@ -7,6 +9,7 @@ interface World {
   id: string;
   name: string;
   description: string;
+  image: ImageSource;
   isAvailable: boolean;
 }
 
@@ -16,6 +19,7 @@ const WORLDS: readonly World[] = [
     name: 'Valdris',
     description:
       'Os deuses estão mortos. Seu poder se fragmentou e espalhou pelo mundo há 400 anos. Cada reino foi construído sobre um fragmento — e os fragmentos estão desaparecendo.',
+    image: require('../../../assets/images/worlds/valdris.png'),
     isAvailable: true,
   },
   {
@@ -23,6 +27,7 @@ const WORLDS: readonly World[] = [
     name: 'Ferrumclave',
     description:
       'Autômatos desenvolveram consciência há 30 anos. Não têm direitos legais. A revolução industrial foi construída sobre seu trabalho.',
+    image: require('../../../assets/images/worlds/ferrumclave.png'),
     isAvailable: false,
   },
   {
@@ -30,6 +35,7 @@ const WORLDS: readonly World[] = [
     name: 'Vazio entre Estrelas',
     description:
       'Viagem interestelar existe mas leva gerações. Quem parte nunca retorna ao mesmo mundo que deixou.',
+    image: require('../../../assets/images/worlds/vazio-entre-estrelas.png'),
     isAvailable: false,
   },
   {
@@ -37,6 +43,7 @@ const WORLDS: readonly World[] = [
     name: 'Thalassar',
     description:
       'O oceano não tem fundo, e algo lá embaixo responde quando você desce fundo o suficiente.',
+    image: require('../../../assets/images/worlds/thalassar.png'),
     isAvailable: false,
   },
   {
@@ -44,6 +51,7 @@ const WORLDS: readonly World[] = [
     name: 'Cinzas de Umbra',
     description:
       'A morte não é o fim, mas o que vem depois é pior. Os vivos e os mortos compartilham o mesmo espaço.',
+    image: require('../../../assets/images/worlds/cinzas-de-umbra.png'),
     isAvailable: false,
   },
   {
@@ -51,6 +59,7 @@ const WORLDS: readonly World[] = [
     name: 'Kenhado',
     description:
       'Espíritos e humanos viveram em equilíbrio por milênios através de um pacto sagrado. O pacto foi quebrado recentemente.',
+    image: require('../../../assets/images/worlds/kenhado.png'),
     isAvailable: false,
   },
 ];
@@ -99,6 +108,7 @@ export default function WorldSelection() {
               id={world.id}
               name={world.name}
               description={world.description}
+              image={world.image}
               isAvailable={world.isAvailable}
               onSelect={handleWorldSelect}
             />

@@ -8,6 +8,7 @@ export const colors = {
   success: '#32CD32',
   surface: '#252545',
   overlay: 'rgba(0, 0, 0, 0.6)',
+  backgroundOverlay: 'rgba(0, 0, 0, 0.85)',
   narration: '#C9A84C',
   oocText: '#808080',
 } as const;

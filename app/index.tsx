@@ -1,21 +1,23 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
-  SafeAreaView,
   Pressable,
   StyleSheet,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { CampaignCard } from '../src/ui/CampaignCard';
 import { useCampaignStore } from '../src/store/campaign-store';
+import { useRepository } from '../src/persistence/hooks/use-repository';
 import { colors, spacing, borderRadius } from '../src/ui/theme';
 
 const FREE_TIER_ACTIVE_LIMIT = 1;
 
 export default function CampaignHub() {
+  const repos = useRepository();
   const campaigns = useCampaignStore((s) => s.campaigns);
   const [freeTierWarning, setFreeTierWarning] = useState(false);
 
@@ -26,6 +28,16 @@ export default function CampaignHub() {
         new Date(b.last_played_at).getTime() -
         new Date(a.last_played_at).getTime(),
     );
+
+  const handleArchive = useCallback(
+    (id: string) => {
+      repos.campaigns.archive(id);
+      useCampaignStore.getState().removeCampaign(id);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setFreeTierWarning(false);
+    },
+    [repos],
+  );
 
   const handleNewCampaign = () => {
     if (activeCampaigns.length >= FREE_TIER_ACTIVE_LIMIT) {
@@ -77,6 +89,7 @@ export default function CampaignHub() {
                   lastPlayedAt={campaign.last_played_at}
                   thumbnailPath={campaign.thumbnail_path}
                   onPress={handleCampaignPress}
+                  onArchive={handleArchive}
                 />
               </View>
             ))}

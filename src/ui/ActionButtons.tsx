@@ -1,4 +1,4 @@
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, borderRadius } from './theme';
 
@@ -13,7 +13,11 @@ export function ActionButtons({
   onActionPress,
   disabled = false,
 }: ActionButtonsProps) {
-  if (actions.length === 0) {
+  const validActions = actions
+    .map((a) => a.trim())
+    .filter((a) => a.length > 0);
+
+  if (validActions.length === 0) {
     return null;
   }
 
@@ -25,25 +29,29 @@ export function ActionButtons({
 
   return (
     <View style={styles.container}>
-      {actions.slice(0, 4).map((action) => (
-        <Pressable
-          key={action}
+      {validActions.slice(0, 4).map((action, index) => (
+        <TouchableOpacity
+          key={index}
           onPress={() => handlePress(action)}
           disabled={disabled}
+          activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel={action}
-          style={({ pressed }) => [
-            styles.chip,
-            pressed && !disabled && styles.chipPressed,
-            disabled && styles.chipDisabled,
+          style={[
+            styles.actionCard,
+            disabled && styles.actionCardDisabled,
           ]}
         >
           <Text
-            style={[styles.chipText, disabled && styles.chipTextDisabled]}
+            style={[styles.actionText, disabled && styles.actionTextDisabled]}
+            numberOfLines={2}
           >
             {action}
           </Text>
-        </Pressable>
+          <Text style={[styles.chevron, disabled && styles.chevronDisabled]}>
+            {'\u203A'}
+          </Text>
+        </TouchableOpacity>
       ))}
     </View>
   );
@@ -51,28 +59,38 @@ export function ActionButtons({
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
   },
-  chip: {
+  actionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(201, 168, 76, 0.12)',
     borderWidth: 1,
-    borderColor: colors.accent,
+    borderColor: 'rgba(201, 168, 76, 0.4)',
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
     borderRadius: borderRadius.chip,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 14,
   },
-  chipPressed: {
-    backgroundColor: 'rgba(201, 168, 76, 0.2)',
+  actionCardDisabled: {
+    opacity: 0.5,
   },
-  chipDisabled: {
-    opacity: 0.4,
+  actionText: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 15,
+    lineHeight: 22,
   },
-  chipText: {
+  actionTextDisabled: {
+    color: colors.muted,
+  },
+  chevron: {
     color: colors.accent,
-    fontSize: 14,
+    fontSize: 20,
+    marginLeft: 8,
   },
-  chipTextDisabled: {
-    opacity: 1,
+  chevronDisabled: {
+    color: colors.muted,
   },
 });

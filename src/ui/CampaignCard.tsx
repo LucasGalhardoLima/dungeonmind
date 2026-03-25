@@ -1,9 +1,19 @@
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { useRef } from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  Animated as RNAnimated,
+} from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { Swipeable } from 'react-native-gesture-handler';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { colors } from './theme';
 import type { World, AdventureType } from '../types/entities';
+
+const ARCHIVE_ACTION_WIDTH = 90;
 
 interface CampaignCardProps {
   id: string;
@@ -14,6 +24,7 @@ interface CampaignCardProps {
   lastPlayedAt: string;
   thumbnailPath: string | null;
   onPress: (id: string) => void;
+  onArchive: (id: string) => void;
 }
 
 const WORLD_LABELS: Record<World, string> = { valdris: 'Valdris' };
@@ -69,60 +80,100 @@ export function CampaignCard({
   lastPlayedAt,
   thumbnailPath,
   onPress,
+  onArchive,
 }: CampaignCardProps) {
+  const swipeableRef = useRef<Swipeable>(null);
+
   const handlePress = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress(id);
   };
 
+  const handleArchive = () => {
+    swipeableRef.current?.close();
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onArchive(id);
+  };
+
+  const renderRightActions = (
+    progress: RNAnimated.AnimatedInterpolation<number>,
+  ) => {
+    const translateX = progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [ARCHIVE_ACTION_WIDTH, 0],
+    });
+
+    return (
+      <RNAnimated.View
+        style={[styles.archiveAction, { transform: [{ translateX }] }]}
+      >
+        <Pressable
+          onPress={handleArchive}
+          style={styles.archiveButton}
+          accessibilityRole="button"
+          accessibilityLabel={`Arquivar campanha ${name}`}
+        >
+          <Text style={styles.archiveText}>Arquivar</Text>
+        </Pressable>
+      </RNAnimated.View>
+    );
+  };
+
   return (
     <Animated.View entering={FadeIn}>
-      <Pressable
-        onPress={handlePress}
-        accessibilityRole="button"
-        accessibilityLabel={`Campanha ${name}. ${WORLD_LABELS[world]}, ${ADVENTURE_TYPE_LABELS[adventureType]}. ${String(sessionCount)} ${sessionCount === 1 ? 'sessão' : 'sessões'}`}
-        style={styles.card}
+      <Swipeable
+        ref={swipeableRef}
+        renderRightActions={renderRightActions}
+        overshootRight={false}
+        rightThreshold={40}
       >
-        {/* Thumbnail */}
-        {thumbnailPath !== null ? (
-          <Image
-            source={{ uri: thumbnailPath }}
-            style={styles.thumbnail}
-            contentFit="cover"
-            transition={200}
-          />
-        ) : (
-          <View style={styles.placeholder}>
-            <Text style={styles.placeholderEmoji}>⚔</Text>
-          </View>
-        )}
+        <Pressable
+          onPress={handlePress}
+          accessibilityRole="button"
+          accessibilityLabel={`Campanha ${name}. ${WORLD_LABELS[world]}, ${ADVENTURE_TYPE_LABELS[adventureType]}. ${String(sessionCount)} ${sessionCount === 1 ? 'sessão' : 'sessões'}`}
+          style={styles.card}
+        >
+          {/* Thumbnail */}
+          {thumbnailPath !== null ? (
+            <Image
+              source={{ uri: thumbnailPath }}
+              style={styles.thumbnail}
+              contentFit="cover"
+              transition={200}
+            />
+          ) : (
+            <View style={styles.placeholder}>
+              <Text style={styles.placeholderEmoji}>⚔</Text>
+            </View>
+          )}
 
-        {/* Info Section */}
-        <View style={styles.info}>
-          <Text style={styles.campaignName} numberOfLines={1}>
-            {name}
-          </Text>
-
-          <View style={styles.worldBadge}>
-            <Text style={styles.worldBadgeText}>
-              {WORLD_LABELS[world]}
+          {/* Info Section */}
+          <View style={styles.info}>
+            <Text style={styles.campaignName} numberOfLines={1}>
+              {name}
             </Text>
-          </View>
 
-          <Text style={styles.adventureType} numberOfLines={1}>
-            {ADVENTURE_TYPE_LABELS[adventureType]}
-          </Text>
+            <View style={styles.worldBadge}>
+              <Text style={styles.worldBadgeText}>
+                {WORLD_LABELS[world]}
+              </Text>
+            </View>
 
-          <View style={styles.bottomRow}>
-            <Text style={styles.sessionCount}>
-              {sessionCount} {sessionCount === 1 ? 'sessão' : 'sessões'}
+            <Text style={styles.adventureType} numberOfLines={1}>
+              {ADVENTURE_TYPE_LABELS[adventureType]}
             </Text>
-            <Text style={styles.lastPlayed}>
-              {formatRelativeTime(lastPlayedAt)}
-            </Text>
+
+            <View style={styles.bottomRow}>
+              <Text style={styles.sessionCount}>
+                {sessionCount} {sessionCount === 1 ? 'sessão' : 'sessões'}
+              </Text>
+              <Text style={styles.lastPlayed}>
+                {formatRelativeTime(lastPlayedAt)}
+              </Text>
+            </View>
           </View>
-        </View>
-      </Pressable>
+        </Pressable>
+      </Swipeable>
     </Animated.View>
   );
 }
@@ -190,5 +241,23 @@ const styles = StyleSheet.create({
   lastPlayed: {
     color: colors.muted,
     fontSize: 12,
+  },
+  archiveAction: {
+    width: ARCHIVE_ACTION_WIDTH,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  archiveButton: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: colors.danger,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  archiveText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

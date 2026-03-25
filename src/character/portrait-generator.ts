@@ -3,7 +3,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import Constants from 'expo-constants';
 import type { PortraitPrompt } from '../types/scene-prompt';
-import { IMAGE_CONFIG, PORTRAIT_STYLE_TOKENS, DEFAULT_NEGATIVE_PROMPT } from '../types/scene-prompt';
+import { PORTRAIT_IMAGE_CONFIG, PORTRAIT_STYLE_TOKENS, DEFAULT_NEGATIVE_PROMPT } from '../types/scene-prompt';
 
 const REPLICATE_API_KEY =
   Constants.expoConfig?.extra?.EXPO_PUBLIC_REPLICATE_API_KEY ??
@@ -11,8 +11,11 @@ const REPLICATE_API_KEY =
   '';
 
 const REPLICATE_API_URL = 'https://api.replicate.com/v1/predictions';
+
+// stability-ai/sdxl latest version hash
+const SDXL_VERSION = '7762fd07cf82c948538e41f63f77d685e02b063e37e496e96eefd46c929f9bdc';
 const POLL_INTERVAL_MS = 1000;
-const TIMEOUT_MS = 15000;
+const TIMEOUT_MS = 60000;
 const PORTRAITS_DIR = `${FileSystem.documentDirectory}portraits/`;
 
 type PredictionStatus = 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled';
@@ -79,16 +82,16 @@ async function createPrediction(textPrompt: string, seed: number): Promise<Repli
       Prefer: 'wait',
     },
     body: JSON.stringify({
-      version: 'nerijs/pixel-art-xl',
+      version: SDXL_VERSION,
       input: {
         prompt: textPrompt,
         negative_prompt: DEFAULT_NEGATIVE_PROMPT,
-        width: IMAGE_CONFIG.width,
-        height: IMAGE_CONFIG.height,
-        scheduler: IMAGE_CONFIG.scheduler,
-        num_inference_steps: IMAGE_CONFIG.num_inference_steps,
-        guidance_scale: IMAGE_CONFIG.guidance_scale,
-        num_outputs: IMAGE_CONFIG.num_outputs,
+        width: PORTRAIT_IMAGE_CONFIG.width,
+        height: PORTRAIT_IMAGE_CONFIG.height,
+        scheduler: PORTRAIT_IMAGE_CONFIG.scheduler,
+        num_inference_steps: PORTRAIT_IMAGE_CONFIG.num_inference_steps,
+        guidance_scale: PORTRAIT_IMAGE_CONFIG.guidance_scale,
+        num_outputs: PORTRAIT_IMAGE_CONFIG.num_outputs,
         seed,
       },
     }),

@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { View, Text, Pressable, Dimensions } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { Image } from 'expo-image';
+import { Image, type ImageSource } from 'expo-image';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import { colors } from './theme';
@@ -15,7 +15,7 @@ interface WorldCardProps {
   id: string;
   name: string;
   description: string;
-  imagePath?: string;
+  image?: ImageSource;
   audioPath?: string;
   isAvailable: boolean;
   onSelect: (id: string) => void;
@@ -25,7 +25,7 @@ export function WorldCard({
   id,
   name,
   description,
-  imagePath,
+  image,
   audioPath,
   isAvailable,
   onSelect,
@@ -97,9 +97,9 @@ export function WorldCard({
         >
           {/* Image section */}
           <View style={{ width: '100%', height: IMAGE_HEIGHT, position: 'relative' }}>
-            {imagePath ? (
+            {image ? (
               <Image
-                source={{ uri: imagePath }}
+                source={image}
                 style={{ width: '100%', height: '100%' }}
                 contentFit="cover"
               />

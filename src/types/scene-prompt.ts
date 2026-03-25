@@ -42,6 +42,15 @@ export const PORTRAIT_STYLE_TOKENS = [
 ];
 
 export const IMAGE_CONFIG = {
+  width: 768,
+  height: 1344,
+  scheduler: 'K_EULER' as const,
+  num_inference_steps: 25,
+  guidance_scale: 7.5,
+  num_outputs: 1,
+};
+
+export const PORTRAIT_IMAGE_CONFIG = {
   width: 512,
   height: 512,
   scheduler: 'K_EULER' as const,
