@@ -23,6 +23,14 @@ const WORLDS: readonly World[] = [
     isAvailable: true,
   },
   {
+    id: 'ashenmoor',
+    name: 'Ashenmoor',
+    description:
+      'Uma maldição ancestral consome a terra. A nobreza fez um pacto com entidades além do véu — e o preço nunca foi pago. Os mortos não permanecem mortos.',
+    image: require('../../../assets/images/worlds/ashenmoor.png'),
+    isAvailable: true,
+  },
+  {
     id: 'ferrumclave',
     name: 'Ferrumclave',
     description:

@@ -2,13 +2,15 @@ import { randomUUID } from 'expo-crypto';
 import * as SQLite from 'expo-sqlite';
 import { migration001 } from './migrations/001-initial';
 import { migration002 } from './migrations/002-dnd-mechanics';
+import { migration003 } from './migrations/003-onboarding';
+import { migration004 } from './migrations/004-ashenmoor';
 
 interface Migration {
   version: number;
   up(db: SQLite.SQLiteDatabase): void;
 }
 
-const migrations: Migration[] = [migration001, migration002];
+const migrations: Migration[] = [migration001, migration002, migration003, migration004];
 
 const DB_NAME = 'dungeonmind.db';
 

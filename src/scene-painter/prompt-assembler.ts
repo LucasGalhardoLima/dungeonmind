@@ -1,7 +1,12 @@
 import type { ScenePrompt, SceneTone } from '../types/scene-prompt';
-import type { Character, Campaign, NPC } from '../types/entities';
+import type { Character, Campaign, NPC, World } from '../types/entities';
 import type { StateDocument } from '../types/state-document';
-import { DEFAULT_NEGATIVE_PROMPT, VALDRIS_STYLE_TOKENS } from '../types/scene-prompt';
+import { DEFAULT_NEGATIVE_PROMPT, VALDRIS_STYLE_TOKENS, ASHENMOOR_STYLE_TOKENS } from '../types/scene-prompt';
+
+const WORLD_STYLE_TOKENS: Record<World, readonly string[]> = {
+  valdris: VALDRIS_STYLE_TOKENS,
+  ashenmoor: ASHENMOOR_STYLE_TOKENS,
+};
 
 type SceneTrigger =
   | 'campaign_start'
@@ -97,6 +102,7 @@ function buildCharacters(
  */
 export function assembleScenePrompt(params: AssembleSceneParams): ScenePrompt {
   const {
+    campaign,
     character,
     stateDocument,
     npcsInScene,
@@ -104,11 +110,13 @@ export function assembleScenePrompt(params: AssembleSceneParams): ScenePrompt {
     trigger,
   } = params;
 
+  const tokens = WORLD_STYLE_TOKENS[campaign.world] ?? VALDRIS_STYLE_TOKENS;
+
   return {
     setting: buildSetting(stateDocument.world_state),
     characters: buildCharacters(character, npcsInScene),
     tone: inferTone(trigger, narrativeContext),
-    style_tokens: [...VALDRIS_STYLE_TOKENS],
+    style_tokens: [...tokens],
     negative_prompt: DEFAULT_NEGATIVE_PROMPT,
   };
 }

@@ -38,10 +38,16 @@ function parseHooks(text: string): string[] {
   }
 }
 
-function buildSystemPrompt(adventureType: AdventureType): string {
+const WORLD_HOOK_CONTEXTS: Record<World, string> = {
+  valdris: 'Valdris (Alta Fantasia — os deuses estão mortos, fragmentos de poder divino espalham-se pelo mundo)',
+  ashenmoor: 'Ashenmoor (Horror Gótico — uma maldição ancestral consome a terra, nobreza amaldiçoada, charnecas assombradas e horrores eldritch espreitam na névoa)',
+};
+
+function buildSystemPrompt(world: World, adventureType: AdventureType): string {
   const label = ADVENTURE_TYPE_LABELS[adventureType];
+  const worldContext = WORLD_HOOK_CONTEXTS[world] ?? WORLD_HOOK_CONTEXTS.valdris;
   return `Você é um mestre de RPG criando ganchos de abertura para campanhas.
-Mundo: Valdris (Alta Fantasia — os deuses estão mortos, fragmentos de poder divino espalham-se pelo mundo)
+Mundo: ${worldContext}
 Tipo de Aventura: ${label}
 
 Gere exatamente 3 ganchos de abertura distintos para uma campanha neste mundo e tipo de aventura.
@@ -74,7 +80,7 @@ export default function OpeningHooks() {
     setHooks([]);
     setSelectedHook(null);
 
-    const systemPrompt = buildSystemPrompt(adventureType);
+    const systemPrompt = buildSystemPrompt(world as World, adventureType);
     const userMessage = 'Gere os ganchos de abertura.';
 
     let completed = false;
@@ -119,7 +125,7 @@ export default function OpeningHooks() {
     }).catch(() => {
       // Promise rejection already handled by onError callback
     });
-  }, [adventureType]);
+  }, [world, adventureType]);
 
   useEffect(() => {
     generateHooks();
@@ -148,7 +154,7 @@ export default function OpeningHooks() {
     const campaign = repos.campaigns.create({
       player_id: playerId,
       session_code: null,
-      world: world as 'valdris',
+      world: world as World,
       adventure_type: adventureType,
       name: '',
       opening_hook: hookText,

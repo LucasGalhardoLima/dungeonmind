@@ -27,7 +27,7 @@ interface CampaignCardProps {
   onArchive: (id: string) => void;
 }
 
-const WORLD_LABELS: Record<World, string> = { valdris: 'Valdris' };
+const WORLD_LABELS: Record<World, string> = { valdris: 'Valdris', ashenmoor: 'Ashenmoor' };
 
 const ADVENTURE_TYPE_LABELS: Record<AdventureType, string> = {
   dungeon_crawl: 'Exploração de Masmorra',
