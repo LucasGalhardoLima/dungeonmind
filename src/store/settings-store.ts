@@ -15,6 +15,8 @@ interface SettingsState {
     db: SQLiteDatabase,
     prefs: Record<string, boolean>
   ): void;
+  updateAnalyticsOptOut(db: SQLiteDatabase, optOut: boolean): void;
+  completeOnboarding(db: SQLiteDatabase): void;
   getPlayerId(): string | null;
 }
 
@@ -28,6 +30,8 @@ function mapPlayerRow(row: Record<string, unknown>): Player {
     notification_preferences: JSON.parse(
       (row['notification_preferences'] as string) || '{}'
     ) as Record<string, boolean>,
+    onboarding_completed: (row['onboarding_completed'] as number) === 1,
+    analytics_opt_out: (row['analytics_opt_out'] as number) === 1,
     created_at: row['created_at'] as string,
     updated_at: row['updated_at'] as string,
   };
@@ -59,6 +63,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         mature_content_enabled: false,
         difficulty_preference: 'standard',
         notification_preferences: {},
+        onboarding_completed: false,
+        analytics_opt_out: false,
         created_at: now,
         updated_at: now,
       };
@@ -117,6 +123,32 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     );
     set({
       player: { ...player, notification_preferences: merged, updated_at: now },
+    });
+  },
+
+  updateAnalyticsOptOut(db: SQLiteDatabase, optOut: boolean) {
+    const { player } = get();
+    if (!player) return;
+    const now = nowISO();
+    db.runSync(
+      'UPDATE player SET analytics_opt_out = ?, updated_at = ? WHERE id = ?',
+      [optOut ? 1 : 0, now, player.id]
+    );
+    set({
+      player: { ...player, analytics_opt_out: optOut, updated_at: now },
+    });
+  },
+
+  completeOnboarding(db: SQLiteDatabase) {
+    const { player } = get();
+    if (!player) return;
+    const now = nowISO();
+    db.runSync(
+      'UPDATE player SET onboarding_completed = 1, updated_at = ? WHERE id = ?',
+      [now, player.id]
+    );
+    set({
+      player: { ...player, onboarding_completed: true, updated_at: now },
     });
   },
 

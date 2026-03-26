@@ -10,7 +10,9 @@ import type { DiceRequest } from '../../types/dice';
 import type { ScenePrompt } from '../../types/scene-prompt';
 import type { StateDocument } from '../../types/state-document';
 import { EMPTY_STATE_DOCUMENT } from '../../types/state-document';
-import { generateId, nowISO } from '../../persistence/database';
+import { generateId, nowISO, getDatabase } from '../../persistence/database';
+import { snapshotSessionMetrics } from '../../feedback/session-analytics';
+import { trackEvent } from '../../analytics/analytics-service';
 import { calculateLevelUp } from '../mechanics/leveling';
 import { calculateAC } from '../mechanics/ac-calculator';
 import { applyShortRest, applyLongRest } from '../mechanics/rest-recovery';
@@ -26,6 +28,7 @@ import { buildNotificationContent } from '../../notifications/notification-categ
 
 interface UseDMEngineReturn {
   sendPlayerAction: (text: string) => Promise<void>;
+  retryLastAction: () => void;
   submitDiceResult: (result: number) => Promise<void>;
   endSession: () => Promise<string | null>;
   streamingText: string;
@@ -39,6 +42,7 @@ interface UseDMEngineReturn {
 export function useDMEngine(): UseDMEngineReturn {
   const repos = useRepository();
   const errorRef = useRef<NarrativeError | null>(null);
+  const lastPlayerActionRef = useRef<string | null>(null);
 
   const streamingText = useSessionStore((s) => s.streamingText);
   const isStreaming = useSessionStore((s) => s.isStreaming);
@@ -100,6 +104,7 @@ export function useDMEngine(): UseDMEngineReturn {
       if (!selectedCampaign || !activeSession) return;
 
       errorRef.current = null;
+      lastPlayerActionRef.current = text;
       setStreamingText('');
       setIsStreaming(true);
       setDiceRequest(null);
@@ -117,6 +122,7 @@ export function useDMEngine(): UseDMEngineReturn {
         sequence: playerSequence,
       });
       addExchange(playerExchange);
+      trackEvent(getDatabase(), 'exchange_sent', { campaign_id: selectedCampaign.id });
 
       const characters = repos.characters.getByCampaignId(selectedCampaign.id);
       const character = characters[0] ?? null;
@@ -381,9 +387,11 @@ export function useDMEngine(): UseDMEngineReturn {
             setIsStreaming(false);
           },
           onDiceRequest(request: DiceRequest) {
+            trackEvent(getDatabase(), 'dice_rolled', { dice_type: request.dice_type });
             setDiceRequest(request);
           },
           onSceneChange(prompt: ScenePrompt) {
+            trackEvent(getDatabase(), 'scene_generated');
             setCurrentScenePrompt(prompt);
           },
           onError(error: NarrativeError) {
@@ -410,6 +418,14 @@ export function useDMEngine(): UseDMEngineReturn {
       stopTokenFlush,
     ]
   );
+
+  const retryLastAction = useCallback(() => {
+    if (lastPlayerActionRef.current !== null) {
+      // Remove the player exchange that was saved for the failed attempt
+      // so it doesn't appear twice after retry
+      void sendPlayerAction(lastPlayerActionRef.current);
+    }
+  }, [sendPlayerAction]);
 
   const submitDiceResult = useCallback(
     async (result: number) => {
@@ -454,6 +470,18 @@ export function useDMEngine(): UseDMEngineReturn {
       // Save summary to session
       repos.sessions.updateSummary(activeSession.id, summary);
 
+      // Snapshot session analytics (no PII)
+      try {
+        const db = getDatabase();
+        snapshotSessionMetrics(db, activeSession.id, nowISO());
+        trackEvent(db, 'session_ended', {
+          campaign_id: selectedCampaign.id,
+          exchange_count: exchanges.length,
+        });
+      } catch {
+        // Analytics snapshot failure is non-critical
+      }
+
       // Schedule session summary notification
       try {
         const rateLimiter: RateLimitChecker = {
@@ -491,6 +519,7 @@ export function useDMEngine(): UseDMEngineReturn {
 
   return {
     sendPlayerAction,
+    retryLastAction,
     submitDiceResult,
     endSession,
     streamingText,

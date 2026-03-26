@@ -6,6 +6,7 @@ import { useSessionStore } from '../../../src/store/session-store';
 import { useRepository } from '../../../src/persistence/hooks/use-repository';
 import { getDatabase } from '../../../src/persistence/database';
 import { recordSessionStart } from '../../../src/feedback/session-analytics';
+import { trackEvent } from '../../../src/analytics/analytics-service';
 import { addBreadcrumb } from '../../../src/feedback/sentry';
 import { NarrativeLoading } from '../../../src/ui/NarrativeLoading';
 import { colors } from '../../../src/ui/theme';
@@ -70,6 +71,11 @@ export default function CampaignLayout() {
     try {
       const db = getDatabase();
       recordSessionStart(db, session.id, id, session.started_at);
+      trackEvent(db, 'session_started', {
+        campaign_id: id,
+        world: campaign.world,
+        adventure_type: campaign.adventure_type,
+      });
       addBreadcrumb('session', `Session started: ${session.id}`);
     } catch {
       // Analytics recording failure is non-critical

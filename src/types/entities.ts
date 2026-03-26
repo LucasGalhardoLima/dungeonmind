@@ -30,6 +30,7 @@ export interface Player {
   difficulty_preference: Difficulty;
   notification_preferences: Record<string, boolean>;
   onboarding_completed: boolean;
+  analytics_opt_out: boolean;
   created_at: string;
   updated_at: string;
 }

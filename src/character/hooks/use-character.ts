@@ -19,6 +19,8 @@ import { streamCompletion, streamCompletionGemini } from '../../engine/streaming
 import { stripMetadataForDisplay } from '../../engine/response-parser';
 import { useRepository } from '../../persistence/hooks/use-repository';
 import { useSettingsStore } from '../../store/settings-store';
+import { getDatabase } from '../../persistence/database';
+import { trackEvent } from '../../analytics/analytics-service';
 
 export interface UseCharacterReturn {
   // Creation flow
@@ -393,6 +395,10 @@ export function useCharacter(): UseCharacterReturn {
         const { id: _id, ...dataWithoutId } = characterData;
 
         const savedCharacter = characters.create(dataWithoutId);
+        trackEvent(getDatabase(), 'character_created', {
+          class: savedCharacter.class,
+          race: savedCharacter.race,
+        });
 
         setCharacter(savedCharacter);
         setNarrativeSheet(formatNarrativeSheet(savedCharacter));

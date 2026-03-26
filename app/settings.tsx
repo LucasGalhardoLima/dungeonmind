@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { useRepository } from '../src/persistence/hooks/use-repository';
 import { getDatabase } from '../src/persistence/database';
 import { useFeedbackStore } from '../src/feedback/feedback-store';
 import { getAnalyticsSummary, exportAnalyticsJson } from '../src/feedback/session-analytics';
+import { trackEvent } from '../src/analytics/analytics-service';
 import { colors, spacing, borderRadius, typography } from '../src/ui/theme';
 import type { Difficulty } from '../src/types/entities';
 
@@ -55,6 +56,7 @@ const NOTIFICATION_OPTIONS: ReadonlyArray<{
 ] as const;
 
 const DELETE_TABLES = [
+  'analytics_event',
   'exchange',
   'scene_image',
   'session',
@@ -74,9 +76,14 @@ export default function Settings() {
   const updateNotificationPreferences = useSettingsStore(
     (s) => s.updateNotificationPreferences,
   );
+  const updateAnalyticsOptOut = useSettingsStore((s) => s.updateAnalyticsOptOut);
   const repos = useRepository();
 
   const showFeedbackModal = useFeedbackStore((s) => s.showModal);
+
+  useEffect(() => {
+    trackEvent(db, 'settings_opened');
+  }, [db]);
 
   const [displayName, setDisplayName] = useState(
     player?.display_name ?? 'Adventurer',
@@ -169,10 +176,18 @@ export default function Settings() {
     }
   }, [player, repos]);
 
+  const handleAnalyticsOptOutToggle = useCallback(
+    (optOut: boolean) => {
+      updateAnalyticsOptOut(db, optOut);
+    },
+    [db, updateAnalyticsOptOut],
+  );
+
   const handleSendFeedback = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    trackEvent(db, 'feedback_submitted');
     showFeedbackModal();
-  }, [showFeedbackModal]);
+  }, [db, showFeedbackModal]);
 
   const handleExportAnalytics = useCallback(() => {
     try {
@@ -334,6 +349,24 @@ export default function Settings() {
               </View>
             );
           })}
+        </View>
+
+        {/* Analytics Privacy */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Privacy</Text>
+          <View style={styles.toggleRow}>
+            <Text style={styles.toggleLabel}>Disable Analytics</Text>
+            <Switch
+              value={player.analytics_opt_out}
+              onValueChange={handleAnalyticsOptOutToggle}
+              trackColor={{ false: colors.surface, true: colors.purple }}
+              thumbColor={player.analytics_opt_out ? colors.accent : colors.muted}
+            />
+          </View>
+          <Text style={styles.sectionHint}>
+            Analytics never collect personal data. Disabling stops all event
+            tracking.
+          </Text>
         </View>
 
         {/* Beta Feedback */}
