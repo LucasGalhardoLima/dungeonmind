@@ -38,7 +38,7 @@ export default function CharacterSheet() {
   const handleToggle = useCallback(
     (newMode: SheetMode) => {
       if (newMode !== mode) {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setMode(newMode);
       }
     },
@@ -49,7 +49,7 @@ export default function CharacterSheet() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centered}>
-          <Text style={styles.loadingText}>Carregando personagem...</Text>
+          <Text style={styles.loadingText}>Loading character...</Text>
         </View>
       </SafeAreaView>
     );
@@ -63,9 +63,9 @@ export default function CharacterSheet() {
           style={styles.closeButton}
           onPress={() => router.back()}
           accessibilityRole="button"
-          accessibilityLabel="Fechar ficha"
+          accessibilityLabel="Close character sheet"
         >
-          <Text style={styles.closeButtonText}>Fechar</Text>
+          <Text style={styles.closeButtonText}>Close</Text>
         </Pressable>
       </View>
 
@@ -94,7 +94,7 @@ export default function CharacterSheet() {
                   : styles.toggleTextInactive,
               ]}
             >
-              Narrativa
+              Narrative
             </Text>
           </Pressable>
           <Pressable
@@ -115,7 +115,7 @@ export default function CharacterSheet() {
                   : styles.toggleTextInactive,
               ]}
             >
-              Técnica
+              Technical
             </Text>
           </Pressable>
         </View>
@@ -157,7 +157,7 @@ function NarrativeContent({ narrativeSheet }: NarrativeContentProps) {
   if (!narrativeSheet) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.loadingText}>Carregando ficha narrativa...</Text>
+        <Text style={styles.loadingText}>Loading narrative sheet...</Text>
       </View>
     );
   }
@@ -171,25 +171,25 @@ function NarrativeContent({ narrativeSheet }: NarrativeContentProps) {
 
       {/* Attributes */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Atributos</Text>
+        <Text style={styles.sectionTitle}>Attributes</Text>
         <Text style={styles.narrativeText}>{narrativeSheet.attributes}</Text>
       </View>
 
       {/* Combat */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Combate</Text>
+        <Text style={styles.sectionTitle}>Combat</Text>
         <Text style={styles.narrativeText}>{narrativeSheet.combat}</Text>
       </View>
 
       {/* Equipment */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Equipamento</Text>
+        <Text style={styles.sectionTitle}>Equipment</Text>
         <Text style={styles.narrativeText}>{narrativeSheet.equipment}</Text>
       </View>
 
       {/* Background */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>História</Text>
+        <Text style={styles.sectionTitle}>Background</Text>
         <Text style={styles.narrativeText}>{narrativeSheet.background}</Text>
       </View>
     </View>
@@ -208,7 +208,7 @@ function TechnicalContent({ technicalSheet }: TechnicalContentProps) {
   if (!technicalSheet) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.loadingText}>Carregando ficha técnica...</Text>
+        <Text style={styles.loadingText}>Loading technical sheet...</Text>
       </View>
     );
   }
@@ -224,25 +224,25 @@ function TechnicalContent({ technicalSheet }: TechnicalContentProps) {
       <View style={styles.section}>
         <Text style={styles.characterName}>{technicalSheet.header.name}</Text>
         <Text style={styles.characterSubtitle}>
-          {technicalSheet.header.race} {technicalSheet.header.class} — Nível{' '}
+          {technicalSheet.header.race} {technicalSheet.header.class} — Level{' '}
           {technicalSheet.header.level}
         </Text>
       </View>
 
       {/* Ability Scores */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Atributos</Text>
+        <Text style={styles.sectionTitle}>Ability Scores</Text>
         <View style={styles.abilityScoresTable}>
           {/* Table Header */}
           <View style={styles.abilityRow}>
             <Text style={[styles.abilityCell, styles.abilityHeaderText, styles.abilityCellName]}>
-              Atributo
+              Attribute
             </Text>
             <Text style={[styles.abilityCell, styles.abilityHeaderText, styles.abilityCellAbbr]}>
-              Abr.
+              Abbr.
             </Text>
             <Text style={[styles.abilityCell, styles.abilityHeaderText, styles.abilityCellScore]}>
-              Valor
+              Score
             </Text>
             <Text style={[styles.abilityCell, styles.abilityHeaderText, styles.abilityCellMod]}>
               Mod.
@@ -279,14 +279,14 @@ function TechnicalContent({ technicalSheet }: TechnicalContentProps) {
       {/* AC Display */}
       <View style={styles.section}>
         <View style={styles.statRow}>
-          <Text style={styles.statLabel}>CA (Classe de Armadura)</Text>
+          <Text style={styles.statLabel}>AC (Armor Class)</Text>
           <Text style={styles.statValue}>{technicalSheet.armorClass}</Text>
         </View>
       </View>
 
       {/* HP Bar */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Pontos de Vida</Text>
+        <Text style={styles.sectionTitle}>Hit Points</Text>
         <View style={styles.hpBarContainer}>
           <View style={styles.hpBarBackground}>
             <View
@@ -304,7 +304,7 @@ function TechnicalContent({ technicalSheet }: TechnicalContentProps) {
 
       {/* Saving Throws */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Testes de Resistência</Text>
+        <Text style={styles.sectionTitle}>Saving Throws</Text>
         {technicalSheet.savingThrows.map((save) => (
           <View key={save.name} style={styles.listRow}>
             <View style={styles.listRowLeft}>
@@ -334,7 +334,7 @@ function TechnicalContent({ technicalSheet }: TechnicalContentProps) {
 
       {/* Skills */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Perícias</Text>
+        <Text style={styles.sectionTitle}>Skills</Text>
         {technicalSheet.skills.map((skill) => (
           <View key={skill.name} style={styles.listRow}>
             <View style={styles.listRowLeft}>
@@ -365,7 +365,7 @@ function TechnicalContent({ technicalSheet }: TechnicalContentProps) {
       {/* Class Abilities */}
       {technicalSheet.classAbilities.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Habilidades de Classe</Text>
+          <Text style={styles.sectionTitle}>Class Abilities</Text>
           {technicalSheet.classAbilities.map((ability, idx) => (
             <View key={idx} style={styles.abilityItemRow}>
               <View style={styles.abilityItemLeft}>
@@ -385,12 +385,12 @@ function TechnicalContent({ technicalSheet }: TechnicalContentProps) {
       {/* Spell Slots */}
       {technicalSheet.spellSlots && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Slots de Magia</Text>
+          <Text style={styles.sectionTitle}>Spell Slots</Text>
           <View style={styles.spellSlotsRow}>
             {technicalSheet.spellSlots.max.map((max, idx) =>
               max > 0 ? (
                 <View key={idx} style={styles.slotGroup}>
-                  <Text style={styles.slotLevel}>Nv {idx + 1}</Text>
+                  <Text style={styles.slotLevel}>Lvl {idx + 1}</Text>
                   <View style={styles.slotPips}>
                     {Array.from({ length: max }).map((_, pip) => (
                       <View
@@ -411,15 +411,15 @@ function TechnicalContent({ technicalSheet }: TechnicalContentProps) {
 
       {/* Inventory */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Inventário</Text>
+        <Text style={styles.sectionTitle}>Inventory</Text>
         {technicalSheet.gold > 0 && (
           <View style={styles.goldRow}>
-            <Text style={styles.goldLabel}>Ouro</Text>
-            <Text style={styles.goldValue}>{technicalSheet.gold} PO</Text>
+            <Text style={styles.goldLabel}>Gold</Text>
+            <Text style={styles.goldValue}>{technicalSheet.gold} GP</Text>
           </View>
         )}
         {technicalSheet.inventory.length === 0 ? (
-          <Text style={styles.emptyText}>Nenhum item no inventário.</Text>
+          <Text style={styles.emptyText}>No items in inventory.</Text>
         ) : (
           technicalSheet.inventory.map((item, index) => (
             <View key={`${item.name}-${index}`} style={styles.inventoryRow}>
@@ -432,7 +432,7 @@ function TechnicalContent({ technicalSheet }: TechnicalContentProps) {
 
       {/* XP */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Experiência</Text>
+        <Text style={styles.sectionTitle}>Experience</Text>
         <Text style={styles.xpText}>{technicalSheet.xp} XP</Text>
       </View>
     </View>

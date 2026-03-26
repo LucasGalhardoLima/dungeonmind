@@ -81,7 +81,7 @@ export function WorldCard({
         onPress={handlePress}
         disabled={!isAvailable}
         accessibilityRole="button"
-        accessibilityLabel={`${name}. ${description}${!isAvailable ? '. Indisponível' : ''}`}
+        accessibilityLabel={`${name}. ${description}${!isAvailable ? '. Unavailable' : ''}`}
         accessibilityState={{ disabled: !isAvailable }}
       >
         <View
@@ -114,7 +114,7 @@ export function WorldCard({
                 }}
               >
                 <Text style={{ color: colors.muted, fontSize: 14 }}>
-                  Sem imagem
+                  No image
                 </Text>
               </View>
             )}
@@ -142,7 +142,7 @@ export function WorldCard({
                     marginTop: 4,
                   }}
                 >
-                  Em breve
+                  Coming soon
                 </Text>
               </View>
             )}

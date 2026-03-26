@@ -30,10 +30,10 @@ interface CampaignCardProps {
 const WORLD_LABELS: Record<World, string> = { valdris: 'Valdris', ashenmoor: 'Ashenmoor' };
 
 const ADVENTURE_TYPE_LABELS: Record<AdventureType, string> = {
-  dungeon_crawl: 'Exploração de Masmorra',
-  wilderness_exploration: 'Exploração Selvagem',
-  political_intrigue: 'Intriga Política',
-  horror_survival: 'Horror e Sobrevivência',
+  dungeon_crawl: 'Dungeon Crawl',
+  wilderness_exploration: 'Wilderness Exploration',
+  political_intrigue: 'Political Intrigue',
+  horror_survival: 'Horror & Survival',
 };
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -45,30 +45,30 @@ function formatRelativeTime(isoDate: string): string {
   const diffMs = now - then;
 
   if (diffMs < 0) {
-    return 'Hoje';
+    return 'Today';
   }
 
   const diffDays = Math.floor(diffMs / MS_PER_DAY);
 
   if (diffDays === 0) {
-    return 'Hoje';
+    return 'Today';
   }
 
   if (diffDays === 1) {
-    return 'Ontem';
+    return 'Yesterday';
   }
 
   if (diffDays < 7) {
-    return `${diffDays} dias atrás`;
+    return `${diffDays} days ago`;
   }
 
   const diffWeeks = Math.floor(diffMs / MS_PER_WEEK);
 
   if (diffWeeks === 1) {
-    return '1 semana atrás';
+    return '1 week ago';
   }
 
-  return `${diffWeeks} semanas atrás`;
+  return `${diffWeeks} weeks ago`;
 }
 
 export function CampaignCard({
@@ -111,9 +111,9 @@ export function CampaignCard({
           onPress={handleArchive}
           style={styles.archiveButton}
           accessibilityRole="button"
-          accessibilityLabel={`Arquivar campanha ${name}`}
+          accessibilityLabel={`Archive campaign ${name}`}
         >
-          <Text style={styles.archiveText}>Arquivar</Text>
+          <Text style={styles.archiveText}>Archive</Text>
         </Pressable>
       </RNAnimated.View>
     );
@@ -130,7 +130,7 @@ export function CampaignCard({
         <Pressable
           onPress={handlePress}
           accessibilityRole="button"
-          accessibilityLabel={`Campanha ${name}. ${WORLD_LABELS[world]}, ${ADVENTURE_TYPE_LABELS[adventureType]}. ${String(sessionCount)} ${sessionCount === 1 ? 'sessão' : 'sessões'}`}
+          accessibilityLabel={`Campaign ${name}. ${WORLD_LABELS[world]}, ${ADVENTURE_TYPE_LABELS[adventureType]}. ${String(sessionCount)} ${sessionCount === 1 ? 'session' : 'sessions'}`}
           style={styles.card}
         >
           {/* Thumbnail */}
@@ -165,7 +165,7 @@ export function CampaignCard({
 
             <View style={styles.bottomRow}>
               <Text style={styles.sessionCount}>
-                {sessionCount} {sessionCount === 1 ? 'sessão' : 'sessões'}
+                {sessionCount} {sessionCount === 1 ? 'session' : 'sessions'}
               </Text>
               <Text style={styles.lastPlayed}>
                 {formatRelativeTime(lastPlayedAt)}

@@ -1,0 +1,49 @@
+appId: com.dungeonmind.app
+name: App Store Screenshots
+---
+# ============================================================
+# DungeonMind — App Store Screenshot Automation
+# ============================================================
+# Captures 6 screenshots for App Store listing.
+# Requires demo data to be seeded first via seed-demo-data.ts.
+#
+# Usage:
+#   maestro test scripts/screenshots/maestro/screenshots.yaml
+# ============================================================
+
+# Wait for app to fully launch
+- waitForAnimationToEnd:
+    timeout: 10000
+
+# Screenshot 1: Campaign Hub
+# Shows the main dashboard with world cards and campaign preview
+- assertVisible: "DungeonMind"
+- assertVisible: "The Sunken Cathedral"
+- takeScreenshot: "01-campaign-hub"
+
+# Navigate to the session
+- tapOn: "The Sunken Cathedral"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Screenshot 3: Session Play
+# Shows DM narration with streaming text and narrative atmosphere
+- assertVisible: "The Sunken Cathedral"
+- waitForAnimationToEnd
+- takeScreenshot: "03-session-play"
+
+# Screenshot 4: Character Sheet
+# Navigate to character sheet modal
+- tapOn:
+    id: "📋"
+- waitForAnimationToEnd:
+    timeout: 3000
+- assertVisible: "Kael Stormforge"
+# Switch to Technical mode for the stats view
+- tapOn: "Technical"
+- waitForAnimationToEnd
+- takeScreenshot: "04-character-sheet"
+
+# Close character sheet
+- tapOn: "Close"
+- waitForAnimationToEnd

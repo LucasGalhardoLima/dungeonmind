@@ -17,6 +17,8 @@ import * as Haptics from 'expo-haptics';
 import { useSettingsStore } from '../src/store/settings-store';
 import { useRepository } from '../src/persistence/hooks/use-repository';
 import { getDatabase } from '../src/persistence/database';
+import { useFeedbackStore } from '../src/feedback/feedback-store';
+import { getAnalyticsSummary, exportAnalyticsJson } from '../src/feedback/session-analytics';
 import { colors, spacing, borderRadius, typography } from '../src/ui/theme';
 import type { Difficulty } from '../src/types/entities';
 
@@ -27,18 +29,18 @@ const DIFFICULTY_OPTIONS: ReadonlyArray<{
 }> = [
   {
     value: 'beginner',
-    label: 'Iniciante',
-    description: 'O destino é gentil com os heróis',
+    label: 'Beginner',
+    description: 'Fate is kind to heroes',
   },
   {
     value: 'standard',
-    label: 'Padrão',
-    description: 'O destino é justo',
+    label: 'Standard',
+    description: 'Fate is fair',
   },
   {
     value: 'hardcore',
     label: 'Hardcore',
-    description: 'O destino não perdoa',
+    description: 'Fate shows no mercy',
   },
 ] as const;
 
@@ -46,10 +48,10 @@ const NOTIFICATION_OPTIONS: ReadonlyArray<{
   key: string;
   label: string;
 }> = [
-  { key: 'turn_reminder', label: 'Lembretes de turno' },
-  { key: 'session_summary', label: 'Resumo de sessão' },
-  { key: 'campaign_nudge', label: 'Lembrete de campanha inativa' },
-  { key: 'story_continuation', label: 'Continuação da história' },
+  { key: 'turn_reminder', label: 'Turn Reminders' },
+  { key: 'session_summary', label: 'Session Summary' },
+  { key: 'campaign_nudge', label: 'Inactive Campaign Reminder' },
+  { key: 'story_continuation', label: 'Story Continuation' },
 ] as const;
 
 const DELETE_TABLES = [
@@ -74,8 +76,10 @@ export default function Settings() {
   );
   const repos = useRepository();
 
+  const showFeedbackModal = useFeedbackStore((s) => s.showModal);
+
   const [displayName, setDisplayName] = useState(
-    player?.display_name ?? 'Aventureiro',
+    player?.display_name ?? 'Adventurer',
   );
 
   const handleDisplayNameBlur = useCallback(() => {
@@ -147,12 +151,12 @@ export default function Settings() {
 
       void FileSystem.writeAsStringAsync(filePath, jsonContent).then(() => {
         Alert.alert(
-          'O Narrador fala...',
-          'Seus pergaminhos foram reunidos. Deseja compartilhá-los com o mundo exterior?',
+          'The Narrator Speaks...',
+          'Your scrolls have been gathered. Would you like to share them with the outside world?',
           [
-            { text: 'Cancelar', style: 'cancel' },
+            { text: 'Cancel', style: 'cancel' },
             {
-              text: 'Compartilhar',
+              text: 'Share',
               onPress: () => {
                 void Sharing.shareAsync(filePath);
               },
@@ -161,18 +165,47 @@ export default function Settings() {
         );
       });
     } catch {
-      Alert.alert('Erro', 'Não foi possível exportar os dados.');
+      Alert.alert('Error', 'Unable to export data.');
     }
   }, [player, repos]);
 
+  const handleSendFeedback = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    showFeedbackModal();
+  }, [showFeedbackModal]);
+
+  const handleExportAnalytics = useCallback(() => {
+    try {
+      const json = exportAnalyticsJson(db);
+      const filePath = `${FileSystem.cacheDirectory ?? ''}dungeonmind-analytics.json`;
+      void FileSystem.writeAsStringAsync(filePath, json).then(() => {
+        Alert.alert(
+          'Session Data',
+          'Report generated without personal data. Share with the team?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Share',
+              onPress: () => {
+                void Sharing.shareAsync(filePath);
+              },
+            },
+          ],
+        );
+      });
+    } catch {
+      Alert.alert('Error', 'Unable to export session data.');
+    }
+  }, [db]);
+
   const handleDeleteAll = useCallback(() => {
     Alert.alert(
-      'O Narrador adverte...',
-      'Esta ação é irreversível. Todos os seus personagens, campanhas e histórias serão perdidos para sempre. Tem certeza?',
+      'The Narrator Warns...',
+      'This action is irreversible. All your characters, campaigns, and stories will be lost forever. Are you sure?',
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Apagar Tudo',
+          text: 'Delete Everything',
           style: 'destructive',
           onPress: () => {
             void Haptics.notificationAsync(
@@ -192,7 +225,7 @@ export default function Settings() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Carregando configurações...</Text>
+          <Text style={styles.loadingText}>Loading settings...</Text>
         </View>
       </SafeAreaView>
     );
@@ -206,17 +239,17 @@ export default function Settings() {
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <Text style={styles.title}>Configurações</Text>
+        <Text style={styles.title}>Settings</Text>
 
         {/* Player Display Name */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Nome do Jogador</Text>
+          <Text style={styles.sectionTitle}>Player Name</Text>
           <TextInput
             style={styles.textInput}
             value={displayName}
             onChangeText={setDisplayName}
             onBlur={handleDisplayNameBlur}
-            placeholder="Seu nome de aventureiro"
+            placeholder="Your adventurer name"
             placeholderTextColor={colors.muted}
             maxLength={50}
             returnKeyType="done"
@@ -225,7 +258,7 @@ export default function Settings() {
 
         {/* Difficulty Preference */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Dificuldade</Text>
+          <Text style={styles.sectionTitle}>Difficulty</Text>
           {DIFFICULTY_OPTIONS.map((option) => {
             const isSelected =
               player.difficulty_preference === option.value;
@@ -269,7 +302,7 @@ export default function Settings() {
         {/* Mature Content Toggle */}
         <View style={styles.section}>
           <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>Conteúdo adulto</Text>
+            <Text style={styles.toggleLabel}>Mature Content</Text>
             <Switch
               value={player.mature_content_enabled}
               onValueChange={handleMatureContentToggle}
@@ -283,7 +316,7 @@ export default function Settings() {
 
         {/* Notification Preferences */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notificações</Text>
+          <Text style={styles.sectionTitle}>Notifications</Text>
           {NOTIFICATION_OPTIONS.map((option) => {
             const isEnabled =
               player.notification_preferences[option.key] ?? false;
@@ -303,18 +336,37 @@ export default function Settings() {
           })}
         </View>
 
+        {/* Beta Feedback */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Beta Feedback</Text>
+          <Text style={styles.sectionHint}>
+            Help improve DungeonMind! Shake your device at any time to send
+            feedback quickly.
+          </Text>
+
+          <Pressable style={styles.feedbackButton} onPress={handleSendFeedback}>
+            <Text style={styles.feedbackButtonText}>Send Feedback</Text>
+          </Pressable>
+
+          <Pressable style={styles.analyticsButton} onPress={handleExportAnalytics}>
+            <Text style={styles.analyticsButtonText}>
+              Export session data (without personal data)
+            </Text>
+          </Pressable>
+        </View>
+
         {/* Data Management */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Gerenciamento de Dados</Text>
+          <Text style={styles.sectionTitle}>Data Management</Text>
 
           <Pressable style={styles.exportButton} onPress={handleExport}>
             <Text style={styles.exportButtonText}>
-              Exportar todos os dados
+              Export all data
             </Text>
           </Pressable>
 
           <Pressable style={styles.deleteButton} onPress={handleDeleteAll}>
-            <Text style={styles.deleteButtonText}>Apagar todos os dados</Text>
+            <Text style={styles.deleteButtonText}>Delete all data</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -436,6 +488,43 @@ const styles = StyleSheet.create({
     color: colors.text,
     flex: 1,
     marginRight: spacing.md,
+  },
+  sectionHint: {
+    fontSize: 13,
+    color: colors.muted,
+    fontStyle: 'italic',
+    marginBottom: spacing.md,
+    lineHeight: 18,
+  },
+  feedbackButton: {
+    backgroundColor: colors.purple,
+    borderRadius: borderRadius.button,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.accent,
+    marginBottom: spacing.md,
+  },
+  feedbackButtonText: {
+    color: colors.accent,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  analyticsButton: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.button,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.purple,
+    marginBottom: spacing.sm,
+  },
+  analyticsButtonText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '500',
   },
   exportButton: {
     backgroundColor: colors.surface,

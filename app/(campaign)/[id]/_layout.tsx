@@ -4,6 +4,9 @@ import { Stack, useLocalSearchParams, router } from 'expo-router';
 import { useCampaignStore } from '../../../src/store/campaign-store';
 import { useSessionStore } from '../../../src/store/session-store';
 import { useRepository } from '../../../src/persistence/hooks/use-repository';
+import { getDatabase } from '../../../src/persistence/database';
+import { recordSessionStart } from '../../../src/feedback/session-analytics';
+import { addBreadcrumb } from '../../../src/feedback/sentry';
 import { NarrativeLoading } from '../../../src/ui/NarrativeLoading';
 import { colors } from '../../../src/ui/theme';
 
@@ -63,6 +66,15 @@ export default function CampaignLayout() {
     }
     setActiveSession(session);
 
+    // Record session analytics start
+    try {
+      const db = getDatabase();
+      recordSessionStart(db, session.id, id, session.started_at);
+      addBreadcrumb('session', `Session started: ${session.id}`);
+    } catch {
+      // Analytics recording failure is non-critical
+    }
+
     // Load recent exchanges (last 20)
     const exchanges = repos.exchanges.getRecent(id, 20);
 
@@ -100,7 +112,7 @@ export default function CampaignLayout() {
   if (!isReady) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <NarrativeLoading message="Retomando sua aventura..." />
+        <NarrativeLoading message="Resuming your adventure..." />
       </View>
     );
   }
@@ -112,11 +124,11 @@ export default function CampaignLayout() {
         contentStyle: { backgroundColor: colors.background },
       }}
     >
-      <Stack.Screen name="session" options={{ title: 'Sessão' }} />
+      <Stack.Screen name="session" options={{ title: 'Session' }} />
       <Stack.Screen
         name="character"
         options={{
-          title: 'Personagem',
+          title: 'Character',
           presentation: 'modal',
           animation: 'slide_from_bottom',
         }}
@@ -124,7 +136,7 @@ export default function CampaignLayout() {
       <Stack.Screen
         name="history"
         options={{
-          title: 'Histórico',
+          title: 'History',
           presentation: 'modal',
           animation: 'slide_from_bottom',
         }}
@@ -132,7 +144,7 @@ export default function CampaignLayout() {
       <Stack.Screen
         name="quests"
         options={{
-          title: 'Missões',
+          title: 'Quests',
           presentation: 'modal',
           animation: 'slide_from_bottom',
         }}

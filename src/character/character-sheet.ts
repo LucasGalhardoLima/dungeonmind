@@ -56,34 +56,34 @@ interface AbilityMapping {
 }
 
 const ABILITY_MAPPINGS: readonly AbilityMapping[] = [
-  { key: 'str', name: 'Força', abbreviation: 'FOR' },
-  { key: 'dex', name: 'Destreza', abbreviation: 'DES' },
-  { key: 'con', name: 'Constituição', abbreviation: 'CON' },
-  { key: 'int', name: 'Inteligência', abbreviation: 'INT' },
-  { key: 'wis', name: 'Sabedoria', abbreviation: 'SAB' },
-  { key: 'cha', name: 'Carisma', abbreviation: 'CAR' },
+  { key: 'str', name: 'Strength', abbreviation: 'STR' },
+  { key: 'dex', name: 'Dexterity', abbreviation: 'DEX' },
+  { key: 'con', name: 'Constitution', abbreviation: 'CON' },
+  { key: 'int', name: 'Intelligence', abbreviation: 'INT' },
+  { key: 'wis', name: 'Wisdom', abbreviation: 'WIS' },
+  { key: 'cha', name: 'Charisma', abbreviation: 'CHA' },
 ] as const;
 
-// D&D 5e skills in pt-BR, ordered canonically
+// D&D 5e skills in English, ordered canonically
 const SKILL_NAMES: readonly string[] = [
-  'Acrobacia',
-  'Lidar com Animais',
-  'Arcanismo',
-  'Atletismo',
-  'Enganação',
-  'História',
-  'Intuição',
-  'Intimidação',
-  'Investigação',
-  'Medicina',
-  'Natureza',
-  'Percepção',
-  'Atuação',
-  'Persuasão',
-  'Religião',
-  'Prestidigitação',
-  'Furtividade',
-  'Sobrevivência',
+  'Acrobatics',
+  'Animal Handling',
+  'Arcana',
+  'Athletics',
+  'Deception',
+  'History',
+  'Insight',
+  'Intimidation',
+  'Investigation',
+  'Medicine',
+  'Nature',
+  'Perception',
+  'Performance',
+  'Persuasion',
+  'Religion',
+  'Sleight of Hand',
+  'Stealth',
+  'Survival',
 ] as const;
 
 // --- Narrative descriptors by ability and score range ---
@@ -99,96 +99,96 @@ const SCORE_RANGES: readonly ScoreDescriptor[] = [
     min: 1,
     max: 7,
     descriptors: {
-      str: 'corpo frágil, mal conseguindo empunhar uma arma',
-      dex: 'movimentos desajeitados e hesitantes',
-      con: 'saúde frágil, constantemente debilitado',
-      int: 'mente simples, compreendendo pouco do mundo ao redor',
-      wis: 'percepção turva, frequentemente alheio aos perigos',
-      cha: 'presença apagada, facilmente ignorado por todos',
+      str: 'frail body, barely able to wield a weapon',
+      dex: 'clumsy and hesitant movements',
+      con: 'fragile health, constantly debilitated',
+      int: 'simple mind, understanding little of the world around',
+      wis: 'clouded perception, often oblivious to dangers',
+      cha: 'faded presence, easily ignored by everyone',
     },
   },
   {
     min: 8,
     max: 9,
     descriptors: {
-      str: 'força modesta, suficiente para o dia a dia',
-      dex: 'reflexos um pouco lentos para situações de perigo',
-      con: 'resistência abaixo do esperado para aventureiros',
-      int: 'compreensão limitada de assuntos complexos',
-      wis: 'atenção que às vezes deixa escapar detalhes importantes',
-      cha: 'personalidade reservada, sem muito brilho social',
+      str: 'modest strength, sufficient for daily life',
+      dex: 'reflexes a bit slow for dangerous situations',
+      con: 'endurance below what is expected of adventurers',
+      int: 'limited understanding of complex matters',
+      wis: 'attention that sometimes lets important details slip by',
+      cha: 'reserved personality, without much social flair',
     },
   },
   {
     min: 10,
     max: 11,
     descriptors: {
-      str: 'força comum, nem fraco nem forte',
-      dex: 'agilidade dentro do esperado',
-      con: 'saúde razoável, sem fragilidades aparentes',
-      int: 'mente adequada, capaz de raciocínio comum',
-      wis: 'percepção normal do ambiente ao redor',
-      cha: 'presença comum, sem se destacar em multidões',
+      str: 'average strength, neither weak nor strong',
+      dex: 'agility within the expected range',
+      con: 'reasonable health, with no apparent frailties',
+      int: 'adequate mind, capable of common reasoning',
+      wis: 'normal awareness of the surroundings',
+      cha: 'ordinary presence, blending into crowds',
     },
   },
   {
     min: 12,
     max: 13,
     descriptors: {
-      str: 'músculos firmes que revelam algum treino',
-      dex: 'movimentos ágeis e coordenados',
-      con: 'constituição robusta, resistindo bem ao esforço',
-      int: 'mente perspicaz, conectando informações com facilidade',
-      wis: 'intuição aguçada que percebe o que outros não veem',
-      cha: 'carisma que atrai olhares e atenção',
+      str: 'firm muscles that reveal some training',
+      dex: 'agile and coordinated movements',
+      con: 'robust constitution, enduring exertion well',
+      int: 'keen mind, connecting information with ease',
+      wis: 'sharp intuition that perceives what others do not',
+      cha: 'charisma that draws glances and attention',
     },
   },
   {
     min: 14,
     max: 15,
     descriptors: {
-      str: 'força notável, capaz de feitos impressionantes',
-      dex: 'instintos afiados o suficiente para sentir o perigo antes que ele chegue',
-      con: 'vitalidade impressionante, suportando golpes que derrubariam outros',
-      int: 'intelecto afiado, desvendando enigmas com naturalidade',
-      wis: 'sabedoria notável, lendo intenções e pressentindo ameaças',
-      cha: 'personalidade marcante que inspira confiança ou temor',
+      str: 'remarkable strength, capable of impressive feats',
+      dex: 'instincts sharp enough to sense danger before it arrives',
+      con: 'impressive vitality, withstanding blows that would fell others',
+      int: 'sharp intellect, unraveling enigmas with ease',
+      wis: 'notable wisdom, reading intentions and sensing threats',
+      cha: 'striking personality that inspires trust or fear',
     },
   },
   {
     min: 16,
     max: 17,
     descriptors: {
-      str: 'corpo forjado por anos de batalha',
-      dex: 'reflexos excepcionais, movendo-se como uma sombra',
-      con: 'resistência excepcional, parecendo inesgotável em combate',
-      int: 'brilhantismo intelectual que poucos conseguem acompanhar',
-      wis: 'percepção quase sobrenatural dos arredores',
-      cha: 'presença dominante que comanda qualquer sala',
+      str: 'body forged by years of battle',
+      dex: 'exceptional reflexes, moving like a shadow',
+      con: 'exceptional endurance, seemingly inexhaustible in combat',
+      int: 'intellectual brilliance that few can keep up with',
+      wis: 'near-supernatural perception of the surroundings',
+      cha: 'dominant presence that commands any room',
     },
   },
   {
     min: 18,
     max: 19,
     descriptors: {
-      str: 'força descomunal que inspira lendas',
-      dex: 'agilidade sobre-humana, quase impossível de acompanhar',
-      con: 'constituição de ferro, resistindo ao que mataria mortais comuns',
-      int: 'mente brilhante, rivalizando com os maiores sábios',
-      wis: 'sabedoria profunda, quase oracular em sua clareza',
-      cha: 'magnetismo irresistível que dobra vontades',
+      str: 'enormous strength that inspires legends',
+      dex: 'superhuman agility, nearly impossible to follow',
+      con: 'iron constitution, enduring what would kill ordinary mortals',
+      int: 'brilliant mind, rivaling the greatest sages',
+      wis: 'profound wisdom, nearly oracular in its clarity',
+      cha: 'irresistible magnetism that bends wills',
     },
   },
   {
     min: 20,
     max: 20,
     descriptors: {
-      str: 'força lendária, digna dos heróis das eras passadas',
-      dex: 'graça sobrenatural, como se o tempo curvasse ao seu redor',
-      con: 'vitalidade lendária, um bastião inabalável',
-      int: 'gênio absoluto, capaz de compreender os segredos do multiverso',
-      wis: 'onisciência quase divina, nada escapa à sua percepção',
-      cha: 'aura lendária que faz reinos se curvarem',
+      str: 'legendary strength, worthy of heroes from ages past',
+      dex: 'supernatural grace, as if time bends around them',
+      con: 'legendary vitality, an unshakeable bastion',
+      int: 'absolute genius, able to comprehend the secrets of the multiverse',
+      wis: 'near-divine omniscience, nothing escapes their perception',
+      cha: 'legendary aura that makes kingdoms bow',
     },
   },
 ] as const;
@@ -218,7 +218,7 @@ function formatModifierSign(mod: number): string {
 // --- Narrative sheet formatter ---
 
 export function formatNarrativeSheet(character: Character): NarrativeSheet {
-  const introduction = `Você é ${character.name}, ${character.race} ${character.class} de nível ${character.level}.`;
+  const introduction = `You are ${character.name}, a level ${character.level} ${character.race} ${character.class}.`;
 
   const attributeParts: string[] = [];
   for (const ability of ABILITY_MAPPINGS) {
@@ -235,17 +235,17 @@ export function formatNarrativeSheet(character: Character): NarrativeSheet {
     : 0;
   let hpNarrative: string;
   if (hpRatio >= 1) {
-    hpNarrative = 'em plena forma';
+    hpNarrative = 'in peak condition';
   } else if (hpRatio >= 0.75) {
-    hpNarrative = 'levemente ferido';
+    hpNarrative = 'lightly wounded';
   } else if (hpRatio >= 0.5) {
-    hpNarrative = 'com ferimentos visíveis';
+    hpNarrative = 'visibly injured';
   } else if (hpRatio >= 0.25) {
-    hpNarrative = 'gravemente ferido';
+    hpNarrative = 'gravely wounded';
   } else if (hpRatio > 0) {
-    hpNarrative = 'à beira da morte';
+    hpNarrative = 'on the brink of death';
   } else {
-    hpNarrative = 'caído e inconsciente';
+    hpNarrative = 'fallen and unconscious';
   }
 
   const savingThrowKeys = Object.keys(character.saving_throws);
@@ -255,14 +255,14 @@ export function formatNarrativeSheet(character: Character): NarrativeSheet {
 
   const savesDescription =
     proficientSaves.length > 0
-      ? ` Seu treinamento o preparou para resistir a efeitos de ${proficientSaves.join(', ')}.`
+      ? ` Your training has prepared you to resist effects of ${proficientSaves.join(', ')}.`
       : '';
 
-  const combat = `Atualmente ${hpNarrative} (${character.hp_current}/${character.hp_max} pontos de vida).${savesDescription}`;
+  const combat = `Currently ${hpNarrative} (${character.hp_current}/${character.hp_max} hit points).${savesDescription}`;
 
   let equipment: string;
   if (character.inventory.length === 0) {
-    equipment = 'Você não carrega nenhum pertence consigo.';
+    equipment = 'You carry no belongings with you.';
   } else {
     const itemDescriptions = character.inventory.map((item) => {
       if (item.quantity > 1) {
@@ -270,7 +270,7 @@ export function formatNarrativeSheet(character: Character): NarrativeSheet {
       }
       return item.name;
     });
-    equipment = `Seus pertences incluem: ${itemDescriptions.join(', ')}.`;
+    equipment = `Your belongings include: ${itemDescriptions.join(', ')}.`;
   }
 
   const background = character.backstory;

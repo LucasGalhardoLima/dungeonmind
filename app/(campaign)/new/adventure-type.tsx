@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { AdventureTypeCard } from '../../../src/ui/AdventureTypeCard';
+import { getDatabase } from '../../../src/persistence/database';
+import { trackEvent } from '../../../src/analytics/analytics-service';
 import type { AdventureType } from '../../../src/types/entities';
 import { colors } from '../../../src/ui/theme';
 
@@ -16,43 +18,44 @@ const ADVENTURE_TYPES: Array<{
 }> = [
   {
     type: 'dungeon_crawl',
-    label: 'Exploração de Masmorra',
+    label: 'Dungeon Crawl',
     description:
-      'Progressão linear por ambientes fechados com ameaças escalonadas. Combate a cada 2-3 trocas narrativas.',
+      'Linear progression through enclosed environments with escalating threats. Combat every 2-3 narrative exchanges.',
     exampleLine:
-      'A escuridão engole a tocha. Algo se move nas sombras à frente...',
-    pacing: 'Pesado em ação',
+      'Darkness swallows the torch. Something moves in the shadows ahead...',
+    pacing: 'Action-Heavy',
   },
   {
     type: 'wilderness_exploration',
-    label: 'Exploração Selvagem',
+    label: 'Wilderness Exploration',
     description:
-      'Descoberta aberta por uma região sem destino fixo. A jornada é o conteúdo.',
+      'Open discovery across a region with no fixed destination. The journey is the content.',
     exampleLine:
-      'O horizonte se abre diante de você. Nenhum mapa cobre o que está além...',
-    pacing: 'Equilibrado',
+      'The horizon opens before you. No map covers what lies beyond...',
+    pacing: 'Balanced',
   },
   {
     type: 'political_intrigue',
-    label: 'Intriga Política',
+    label: 'Political Intrigue',
     description:
-      'Navegação por redes de NPCs. Alianças, traições e consequências de escolhas sociais.',
+      'Navigation through NPC networks. Alliances, betrayals, and consequences of social choices.',
     exampleLine:
-      'O conselheiro do rei sorri, mas seus olhos não mentem...',
-    pacing: 'Pesado em narrativa',
+      "The king's counselor smiles, but their eyes don't lie...",
+    pacing: 'Story-Heavy',
   },
   {
     type: 'horror_survival',
-    label: 'Horror e Sobrevivência',
+    label: 'Horror & Survival',
     description:
-      'Revelação escalonada. A ameaça fica mais clara e mais errada conforme a sessão avança.',
-    exampleLine: 'A porta não deveria estar aberta. Algo já entrou...',
-    pacing: 'Narrativa com picos de ação',
+      'Escalating revelation. The threat becomes clearer and more wrong as the session progresses.',
+    exampleLine: "The door shouldn't be open. Something already came in...",
+    pacing: 'Story with Action Peaks',
   },
 ];
 
 export default function AdventureTypeSelection() {
   const params = useLocalSearchParams<Record<'world', string>>();
+  const db = useMemo(() => getDatabase(), []);
   const [selectedType, setSelectedType] = useState<AdventureType | null>(null);
 
   const handleSelect = (type: AdventureType) => {
@@ -62,6 +65,10 @@ export default function AdventureTypeSelection() {
   const handleContinue = () => {
     if (!selectedType) return;
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    trackEvent(db, 'adventure_type_selected', {
+      world: params.world ?? 'unknown',
+      adventure_type: selectedType,
+    });
     router.push({
       pathname: '/(campaign)/new/hooks',
       params: { world: params.world, adventureType: selectedType },
@@ -83,7 +90,7 @@ export default function AdventureTypeSelection() {
             marginBottom: 8,
           }}
         >
-          Tipo de Aventura
+          Adventure Type
         </Text>
 
         <Text
@@ -94,7 +101,7 @@ export default function AdventureTypeSelection() {
             marginBottom: 32,
           }}
         >
-          Como sua história será contada
+          How your story will be told
         </Text>
 
         <View style={{ gap: 16 }}>
@@ -144,7 +151,7 @@ export default function AdventureTypeSelection() {
               fontWeight: 'bold',
             }}
           >
-            Continuar
+            Continue
           </Text>
         </Pressable>
       </View>

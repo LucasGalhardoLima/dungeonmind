@@ -7,10 +7,11 @@ import {
   StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { CampaignCard } from '../src/ui/CampaignCard';
 import { useCampaignStore } from '../src/store/campaign-store';
+import { useSettingsStore } from '../src/store/settings-store';
 import { useRepository } from '../src/persistence/hooks/use-repository';
 import { colors, spacing, borderRadius } from '../src/ui/theme';
 
@@ -18,6 +19,14 @@ const FREE_TIER_ACTIVE_LIMIT = 1;
 
 export default function CampaignHub() {
   const repos = useRepository();
+  const onboardingCompleted = useSettingsStore(
+    (s) => s.player?.onboarding_completed ?? false,
+  );
+
+  if (!onboardingCompleted) {
+    // Typed routes may not include /onboarding until next build regeneration
+    return <Redirect href={'/onboarding' as '/'} />;
+  }
   const campaigns = useCampaignStore((s) => s.campaigns);
   const [freeTierWarning, setFreeTierWarning] = useState(false);
 
@@ -60,15 +69,15 @@ export default function CampaignHub() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>DungeonMind</Text>
-          <Text style={styles.subtitle}>Suas Aventuras</Text>
+          <Text style={styles.subtitle}>Your Adventures</Text>
         </View>
 
         {activeCampaigns.length === 0 ? (
           /* Empty State */
           <View style={styles.emptyState}>
-            <Text style={styles.emptyMessage}>Nenhuma aventura ativa</Text>
+            <Text style={styles.emptyMessage}>No active adventures</Text>
             <Text style={styles.emptyHint}>
-              Sua primeira história aguarda...
+              Your first story awaits...
             </Text>
           </View>
         ) : (
@@ -100,16 +109,21 @@ export default function CampaignHub() {
         {freeTierWarning && (
           <View style={styles.warningContainer}>
             <Text style={styles.warningText}>
-              Você já tem uma campanha ativa. Arquive ou finalize a campanha
-              atual para iniciar uma nova.
+              You already have an active campaign. Archive or complete the
+              current campaign to start a new one.
             </Text>
           </View>
         )}
 
         {/* New Campaign Button */}
         <View style={styles.buttonContainer}>
-          <Pressable onPress={handleNewCampaign} style={styles.newCampaignButton}>
-            <Text style={styles.newCampaignButtonText}>Nova Campanha</Text>
+          <Pressable
+            onPress={handleNewCampaign}
+            style={styles.newCampaignButton}
+            accessibilityRole="button"
+            accessibilityLabel="New campaign"
+          >
+            <Text style={styles.newCampaignButtonText}>New Campaign</Text>
           </Pressable>
         </View>
       </View>

@@ -49,11 +49,11 @@ const TOTAL_EXCHANGES = 8;
 function getInputPlaceholder(phase: string): string {
   switch (phase) {
     case 'naming':
-      return 'Nome do personagem...';
+      return 'Character name...';
     case 'complete':
       return '';
     default:
-      return 'Escreva sua resposta...';
+      return 'Write your answer...';
   }
 }
 
@@ -111,7 +111,7 @@ function ProgressIndicator({ exchangeCount }: { exchangeCount: number }) {
   return (
     <View style={styles.progressContainer}>
       <Text style={styles.progressText}>
-        Pergunta {displayCount} de {TOTAL_EXCHANGES}
+        Question {displayCount} of {TOTAL_EXCHANGES}
       </Text>
       <View style={styles.progressBarBackground}>
         <View
@@ -316,7 +316,7 @@ export default function CreateCharacter() {
   if (messages.length === 0 && !isStreaming && !streamingText) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <NarrativeLoading message="O narrador prepara sua historia..." />
+        <NarrativeLoading message="The narrator prepares your story..." />
       </SafeAreaView>
     );
   }
@@ -342,7 +342,7 @@ export default function CreateCharacter() {
             <Animated.View entering={FadeInDown.delay(300).duration(500)}>
               <Text style={styles.portraitNameText}>{characterName}</Text>
               <Text style={styles.portraitSubtitle}>
-                Sua jornada esta prestes a comecar...
+                Your journey is about to begin...
               </Text>
             </Animated.View>
           )}
@@ -352,7 +352,7 @@ export default function CreateCharacter() {
                 style={styles.startAdventureButton}
                 onPress={() => router.replace(`/(campaign)/${campaignId}/session`)}
               >
-                <Text style={styles.startAdventureText}>Iniciar Aventura</Text>
+                <Text style={styles.startAdventureText}>Start Adventure</Text>
               </Pressable>
             </Animated.View>
           )}
@@ -404,7 +404,7 @@ export default function CreateCharacter() {
           {/* Streaming loading indicator (before any visible tokens arrive) */}
           {isStreaming && stripMetadataForDisplay(streamingText).length === 0 && (
             <View style={styles.loadingContainer}>
-              <NarrativeLoading message="O narrador pondera..." />
+              <NarrativeLoading message="The narrator ponders..." />
             </View>
           )}
 
@@ -418,7 +418,7 @@ export default function CreateCharacter() {
           {/* Retry button when extraction fails */}
           {extractionFailed && (
             <Pressable onPress={retryExtraction} style={styles.retryButton}>
-              <Text style={styles.retryButtonText}>Tentar novamente</Text>
+              <Text style={styles.retryButtonText}>Try again</Text>
             </Pressable>
           )}
         </ScrollView>
@@ -449,7 +449,7 @@ export default function CreateCharacter() {
                 pressed && !(isInputDisabled || inputText.trim().length === 0) && styles.sendButtonPressed,
               ]}
             >
-              <Text style={styles.sendButtonText}>Enviar</Text>
+              <Text style={styles.sendButtonText}>Send</Text>
             </Pressable>
           </View>
         )}
@@ -457,7 +457,7 @@ export default function CreateCharacter() {
         {/* Finalizing indicator */}
         {isFinalizing && !showPortrait && (
           <View style={styles.finalizingContainer}>
-            <NarrativeLoading message="Dando vida ao seu personagem..." />
+            <NarrativeLoading message="Bringing your character to life..." />
           </View>
         )}
       </KeyboardAvoidingView>

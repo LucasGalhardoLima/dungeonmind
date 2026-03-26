@@ -1,14 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { HookCard } from '../../../src/ui/HookCard';
 import { NarrativeLoading } from '../../../src/ui/NarrativeLoading';
+import { getDatabase } from '../../../src/persistence/database';
 import { streamCompletion, streamCompletionGemini } from '../../../src/engine/streaming';
 import { useRepository } from '../../../src/persistence/hooks/use-repository';
 import { useSettingsStore } from '../../../src/store/settings-store';
 import { useCampaignStore } from '../../../src/store/campaign-store';
+import { trackEvent } from '../../../src/analytics/analytics-service';
 import { EMPTY_STATE_DOCUMENT } from '../../../src/types/state-document';
 import { generateAdventureBackground } from '../../../src/scene-painter/scene-painter';
 import { getCacheDir, ensureCacheDir } from '../../../src/scene-painter/image-cache';
@@ -16,10 +18,10 @@ import type { AdventureType, World } from '../../../src/types/entities';
 import { colors, spacing, borderRadius, typography } from '../../../src/ui/theme';
 
 const ADVENTURE_TYPE_LABELS: Record<AdventureType, string> = {
-  dungeon_crawl: 'Exploração de Masmorra',
-  wilderness_exploration: 'Exploração Selvagem',
-  political_intrigue: 'Intriga Política',
-  horror_survival: 'Horror e Sobrevivência',
+  dungeon_crawl: 'Dungeon Crawl',
+  wilderness_exploration: 'Wilderness Exploration',
+  political_intrigue: 'Political Intrigue',
+  horror_survival: 'Horror & Survival',
 };
 
 function parseHooks(text: string): string[] {
@@ -39,24 +41,24 @@ function parseHooks(text: string): string[] {
 }
 
 const WORLD_HOOK_CONTEXTS: Record<World, string> = {
-  valdris: 'Valdris (Alta Fantasia — os deuses estão mortos, fragmentos de poder divino espalham-se pelo mundo)',
-  ashenmoor: 'Ashenmoor (Horror Gótico — uma maldição ancestral consome a terra, nobreza amaldiçoada, charnecas assombradas e horrores eldritch espreitam na névoa)',
+  valdris: 'Valdris (High Fantasy — the gods are dead, fragments of divine power scattered across the world)',
+  ashenmoor: 'Ashenmoor (Gothic Horror — an ancestral curse consumes the land, cursed nobility, haunted moors and eldritch horrors lurk in the fog)',
 };
 
 function buildSystemPrompt(world: World, adventureType: AdventureType): string {
   const label = ADVENTURE_TYPE_LABELS[adventureType];
   const worldContext = WORLD_HOOK_CONTEXTS[world] ?? WORLD_HOOK_CONTEXTS.valdris;
-  return `Você é um mestre de RPG criando ganchos de abertura para campanhas.
-Mundo: ${worldContext}
-Tipo de Aventura: ${label}
+  return `You are an RPG dungeon master creating opening hooks for campaigns.
+World: ${worldContext}
+Adventure Type: ${label}
 
-Gere exatamente 3 ganchos de abertura distintos para uma campanha neste mundo e tipo de aventura.
-Cada gancho deve ter 2-3 frases: uma cena, um conflito e uma pergunta que atraia o jogador.
-Os ganchos devem ser narrativos e em pt-BR.
+Generate exactly 3 distinct opening hooks for a campaign in this world and adventure type.
+Each hook should be 2-3 sentences: a scene, a conflict, and a question that draws the player in.
+The hooks should be narrative and in English.
 
-Retorne os ganchos no formato:
+Return the hooks in the format:
 [HOOKS]
-["gancho 1", "gancho 2", "gancho 3"]
+["hook 1", "hook 2", "hook 3"]
 [/HOOKS]`;
 }
 
@@ -65,6 +67,7 @@ export default function OpeningHooks() {
   const world = params.world ?? 'valdris';
   const adventureType = (params.adventureType ?? 'dungeon_crawl') as AdventureType;
 
+  const db = useMemo(() => getDatabase(), []);
   const repos = useRepository();
   const settingsStore = useSettingsStore();
   const addCampaign = useCampaignStore((s) => s.addCampaign);
@@ -81,7 +84,7 @@ export default function OpeningHooks() {
     setSelectedHook(null);
 
     const systemPrompt = buildSystemPrompt(world as World, adventureType);
-    const userMessage = 'Gere os ganchos de abertura.';
+    const userMessage = 'Generate the opening hooks.';
 
     let completed = false;
 
@@ -90,7 +93,7 @@ export default function OpeningHooks() {
       completed = true;
       const parsed = parseHooks(fullText);
       if (parsed.length === 0) {
-        setError('Não foi possível gerar os ganchos. Tente novamente.');
+        setError('Failed to generate hooks. Try again.');
         setIsLoading(false);
         return;
       }
@@ -108,7 +111,7 @@ export default function OpeningHooks() {
         onError: (fallbackError: Error) => {
           if (completed) return;
           completed = true;
-          setError(`Erro ao gerar ganchos: ${fallbackError.message}`);
+          setError(`Error generating hooks: ${fallbackError.message}`);
           setIsLoading(false);
         },
       }).catch(() => {
@@ -166,6 +169,7 @@ export default function OpeningHooks() {
     });
 
     addCampaign(campaign);
+    trackEvent(db, 'campaign_created', { world: world as string, adventure_type: adventureType });
 
     // Generate adventure background image in the background
     void (async () => {
@@ -189,12 +193,12 @@ export default function OpeningHooks() {
       pathname: '/(campaign)/create-character',
       params: { campaignId: campaign.id, world, adventureType },
     });
-  }, [selectedHook, hooks, settingsStore, repos, world, adventureType, addCampaign]);
+  }, [selectedHook, hooks, settingsStore, repos, world, adventureType, addCampaign, db]);
 
   if (isLoading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-        <NarrativeLoading message="O destino tece suas opções..." />
+        <NarrativeLoading message="Fate weaves your options..." />
       </SafeAreaView>
     );
   }
@@ -218,7 +222,7 @@ export default function OpeningHooks() {
             marginBottom: spacing.sm,
           }}
         >
-          Escolha seu Destino
+          Choose Your Destiny
         </Text>
 
         <Text
@@ -230,7 +234,7 @@ export default function OpeningHooks() {
             lineHeight: 14 * 1.5,
           }}
         >
-          Selecione um gancho de abertura para sua campanha
+          Select an opening hook for your campaign
         </Text>
 
         {/* Error state */}
@@ -270,7 +274,7 @@ export default function OpeningHooks() {
                   fontWeight: '700',
                 }}
               >
-                Tentar Novamente
+                Try Again
               </Text>
             </Pressable>
           </View>
@@ -312,7 +316,7 @@ export default function OpeningHooks() {
                 fontWeight: '600',
               }}
             >
-              Gerar mais opções
+              Generate More Options
             </Text>
           </Pressable>
         )}
@@ -323,7 +327,7 @@ export default function OpeningHooks() {
             onPress={handleStartAdventure}
             disabled={selectedHook === null}
             accessibilityRole="button"
-            accessibilityLabel="Começar Aventura"
+            accessibilityLabel="Start Adventure"
             accessibilityState={{ disabled: selectedHook === null }}
             style={{
               marginTop: spacing.xl,
@@ -344,7 +348,7 @@ export default function OpeningHooks() {
                 fontFamily: typography.heading,
               }}
             >
-              Começar Aventura
+              Start Adventure
             </Text>
           </Pressable>
         )}

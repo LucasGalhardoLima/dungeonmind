@@ -10,10 +10,10 @@ interface DeathSaveOverlayProps {
 export function DeathSaveOverlay({ successes, failures, maxFailures }: DeathSaveOverlayProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Salvaguardas contra a Morte</Text>
+      <Text style={styles.title}>Death Saving Throws</Text>
       <View style={styles.pipsContainer}>
         <View style={styles.pipRow}>
-          <Text style={styles.pipLabel}>Sucessos</Text>
+          <Text style={styles.pipLabel}>Successes</Text>
           <View style={styles.pips}>
             {[0, 1, 2].map((i) => (
               <View
@@ -24,7 +24,7 @@ export function DeathSaveOverlay({ successes, failures, maxFailures }: DeathSave
           </View>
         </View>
         <View style={styles.pipRow}>
-          <Text style={styles.pipLabel}>Falhas</Text>
+          <Text style={styles.pipLabel}>Failures</Text>
           <View style={styles.pips}>
             {Array.from({ length: maxFailures }).map((_, i) => (
               <View
