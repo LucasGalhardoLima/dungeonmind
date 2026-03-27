@@ -1,12 +1,13 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { Text, StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withRepeat,
   withTiming,
   Easing,
+  FadeIn,
 } from 'react-native-reanimated';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { colors } from './theme';
 
 interface NarrationBubbleProps {
@@ -78,10 +79,16 @@ export function NarrationBubble({ text, isStreaming, isLatest }: NarrationBubble
   }));
 
   const showCursor = isStreaming && isLatest;
-  const segments = parseMarkdownSegments(text);
+  const segments = useMemo(() => parseMarkdownSegments(text), [text]);
 
   return (
-    <View style={styles.container} accessibilityRole="text" accessibilityLabel={text}>
+    <Animated.View
+      entering={isStreaming && isLatest ? FadeIn.duration(300) : undefined}
+      style={styles.container}
+      accessibilityRole="text"
+      accessibilityLabel={text}
+      accessibilityLiveRegion={isStreaming && isLatest ? 'polite' : 'none'}
+    >
       <Text style={styles.narrationText}>
         {segments.map((segment, index) =>
           segment.type === 'bold' ? (
@@ -98,7 +105,7 @@ export function NarrationBubble({ text, isStreaming, isLatest }: NarrationBubble
           </Animated.Text>
         )}
       </Text>
-    </View>
+    </Animated.View>
   );
 }
 

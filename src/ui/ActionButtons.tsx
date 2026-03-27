@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Text, TouchableOpacity, StyleSheet } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { colors, borderRadius } from './theme';
 
@@ -7,6 +8,8 @@ interface ActionButtonsProps {
   onActionPress: (action: string) => void;
   disabled?: boolean;
 }
+
+const STAGGER_MS = 80;
 
 export function ActionButtons({
   actions,
@@ -28,32 +31,39 @@ export function ActionButtons({
   };
 
   return (
-    <View style={styles.container}>
+    <Animated.View
+      entering={FadeInDown.duration(250).delay(300)}
+      style={styles.container}
+    >
       {validActions.slice(0, 4).map((action, index) => (
-        <TouchableOpacity
-          key={index}
-          onPress={() => handlePress(action)}
-          disabled={disabled}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel={action}
-          style={[
-            styles.actionCard,
-            disabled && styles.actionCardDisabled,
-          ]}
+        <Animated.View
+          key={`${action}-${index}`}
+          entering={FadeInDown.duration(250).delay(300 + index * STAGGER_MS)}
         >
-          <Text
-            style={[styles.actionText, disabled && styles.actionTextDisabled]}
-            numberOfLines={2}
+          <TouchableOpacity
+            onPress={() => handlePress(action)}
+            disabled={disabled}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={action}
+            style={[
+              styles.actionCard,
+              disabled && styles.actionCardDisabled,
+            ]}
           >
-            {action}
-          </Text>
-          <Text style={[styles.chevron, disabled && styles.chevronDisabled]}>
-            {'\u203A'}
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[styles.actionText, disabled && styles.actionTextDisabled]}
+              numberOfLines={2}
+            >
+              {action}
+            </Text>
+            <Text style={[styles.chevron, disabled && styles.chevronDisabled]}>
+              {'\u203A'}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
       ))}
-    </View>
+    </Animated.View>
   );
 }
 

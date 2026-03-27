@@ -421,10 +421,11 @@ export function useDMEngine(): UseDMEngineReturn {
         session_id: activeSession.id,
         campaign_id: selectedCampaign.id,
         role: 'system',
-        content: `Resultado: ${result} (${diceRequest.dice_type})`,
+        content: `${diceRequest.context}: ${result} (${diceRequest.dice_type})`,
         metadata: JSON.stringify({
           type: 'dice_result',
           dice_type: diceRequest.dice_type,
+          context: diceRequest.context,
           result,
           is_critical: diceRequest.dice_type === 'd20' && (result === 20 || result === 1),
         }),

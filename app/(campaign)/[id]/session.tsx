@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ import { detectShaderType } from '../../../src/scene-painter/shader-animations';
 import { NarrationBubble } from '../../../src/ui/NarrationBubble';
 import { NarrativeLoading } from '../../../src/ui/NarrativeLoading';
 import { ActionButtons } from '../../../src/ui/ActionButtons';
+import { DiceResultBubble, isDiceResultExchange } from '../../../src/ui/DiceResultBubble';
 import { DiceOverlay } from '../../../src/ui/DiceOverlay';
 import { DeathSaveOverlay } from '../../../src/ui/DeathSaveOverlay';
 import { AtmosphericBackground } from '../../../src/ui/AtmosphericBackground';
@@ -47,6 +48,7 @@ interface DisplayExchange {
   id: string;
   role: 'player' | 'dm' | 'system';
   content: string;
+  metadata: string | null;
 }
 
 function mapExchangeToDisplay(exchange: Exchange): DisplayExchange {
@@ -54,6 +56,7 @@ function mapExchangeToDisplay(exchange: Exchange): DisplayExchange {
     id: exchange.id,
     role: exchange.role,
     content: exchange.content,
+    metadata: exchange.metadata ?? null,
   };
 }
 
@@ -108,19 +111,53 @@ export default function SessionScreen() {
   const latestDMContent = recentExchanges.filter(e => e.role === 'dm').at(-1)?.content ?? '';
   const shaderType = detectShaderType(streamingText || latestDMContent, '');
 
-  // Map exchanges to display format
-  const displayExchanges: DisplayExchange[] = recentExchanges.map(mapExchangeToDisplay);
+  // Memoize exchange mapping to avoid re-creating on every render
+  const displayExchanges = useMemo(
+    () => recentExchanges.map(mapExchangeToDisplay),
+    [recentExchanges],
+  );
 
-  // Auto-scroll to bottom when exchanges change or streaming text updates
+  // --- Auto-scroll logic ---
+  const isNearBottomRef = useRef(true);
+
+  const handleScroll = useCallback(
+    (e: { nativeEvent: { contentOffset: { y: number }; layoutMeasurement: { height: number }; contentSize: { height: number } } }) => {
+      const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+      const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+      isNearBottomRef.current = distanceFromBottom < 100;
+    },
+    [],
+  );
+
   const scrollToBottom = useCallback(() => {
-    scrollViewRef.current?.scrollToEnd({ animated: true });
+    if (isNearBottomRef.current) {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }
   }, []);
 
+  // Force-scroll when a new exchange arrives (player sent or DM finished)
+  const prevExchangeCountRef = useRef(displayExchanges.length);
   useEffect(() => {
-    // Small delay to allow layout to settle before scrolling
-    const timeout = setTimeout(scrollToBottom, 100);
-    return () => clearTimeout(timeout);
-  }, [displayExchanges.length, scrollToBottom]);
+    if (displayExchanges.length > prevExchangeCountRef.current) {
+      isNearBottomRef.current = true;
+      const timeout = setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 50);
+      prevExchangeCountRef.current = displayExchanges.length;
+      return () => clearTimeout(timeout);
+    }
+    prevExchangeCountRef.current = displayExchanges.length;
+  }, [displayExchanges.length]);
+
+  // Keep pinned to bottom while DM is streaming (content height grows with each token flush)
+  const prevStreamingLenRef = useRef(0);
+  useEffect(() => {
+    const len = streamingText.length;
+    if (isStreaming && len > prevStreamingLenRef.current) {
+      scrollViewRef.current?.scrollToEnd({ animated: false });
+    }
+    prevStreamingLenRef.current = len;
+  }, [isStreaming, streamingText]);
 
   // Handle sending player action
   const handleSend = useCallback(() => {
@@ -192,6 +229,8 @@ export default function SessionScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={64}
           onContentSizeChange={scrollToBottom}
         >
           {sessionRecap !== null && (
@@ -215,6 +254,15 @@ export default function SessionScreen() {
             }
 
             if (exchange.role === 'system') {
+              if (isDiceResultExchange(exchange.metadata)) {
+                return (
+                  <DiceResultBubble
+                    key={exchange.id}
+                    content={exchange.content}
+                    metadata={exchange.metadata}
+                  />
+                );
+              }
               return (
                 <View key={exchange.id} style={styles.systemRow}>
                   <Text style={styles.systemText}>{exchange.content}</Text>
