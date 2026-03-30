@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "dungeonmind-init",
-    "slug": "dungeonmind-init",
+    "name": "DungeonMind",
+    "slug": "dungeonmind",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "dungeonmindinit",
+    "scheme": "dungeonmind",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,9 +15,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.dungeonmind-init"
+      "bundleIdentifier": "com.dungeonmind.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.dungeonmind.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -25,8 +30,28 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
+    "owner": "dungeonmind",
+    "extra": {
+      "eas": {
+        "projectId": "a3203790-a6f6-46db-a6fe-3c35dbb3a605"
+      },
+      "router": {}
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/a3203790-a6f6-46db-a6fe-3c35dbb3a605"
+    },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "@sentry/react-native",
+        {
+          "organization": "dungeonmind",
+          "project": "dungeonmind-mobile"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
