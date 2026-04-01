@@ -22,15 +22,15 @@ export default function QuestsScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.heading}>Diário de Missões</Text>
+        <Text style={styles.heading}>Quest Journal</Text>
 
         {activeQuests.length === 0 && completedQuests.length === 0 && (
-          <Text style={styles.emptyText}>Nenhuma missão registrada ainda.</Text>
+          <Text style={styles.emptyText}>No quests recorded yet.</Text>
         )}
 
         {activeQuests.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Ativas</Text>
+            <Text style={styles.sectionTitle}>Active</Text>
             {activeQuests.map((quest) => (
               <View key={quest.id} style={styles.questCard}>
                 <Text style={styles.questTitle}>{quest.title}</Text>
@@ -42,7 +42,7 @@ export default function QuestsScreen() {
 
         {completedQuests.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Concluídas</Text>
+            <Text style={styles.sectionTitle}>Completed</Text>
             {completedQuests.map((quest) => (
               <View key={quest.id} style={[styles.questCard, styles.questCardCompleted]}>
                 <Text style={styles.questTitle}>

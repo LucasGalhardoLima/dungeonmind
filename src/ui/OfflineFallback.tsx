@@ -18,11 +18,11 @@ export function OfflineFallback({
     <View style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.heading}>
-          A aventura requer uma conexão com o mundo além...
+          The adventure requires a connection to the world beyond...
         </Text>
 
         <Text style={styles.subtext}>
-          Enquanto espera, releia seu último resumo de sessão.
+          While you wait, reread your last session summary.
         </Text>
 
         {lastSessionSummary != null && lastSessionSummary.length > 0 && (
@@ -41,9 +41,9 @@ export function OfflineFallback({
             pressed ? styles.retryButtonPressed : undefined,
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Tentar novamente"
+          accessibilityLabel="Try again"
         >
-          <Text style={styles.retryButtonText}>Tentar novamente</Text>
+          <Text style={styles.retryButtonText}>Try again</Text>
         </Pressable>
       </View>
     </View>

@@ -3,6 +3,7 @@ import { View, Text } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  useReducedMotion,
   withRepeat,
   withSequence,
   withTiming,
@@ -17,11 +18,16 @@ interface NarrativeLoadingProps {
 const ELLIPSIS_DOTS = ['·', '·', '·'];
 
 export function NarrativeLoading({
-  message = 'A história se desdobra...',
+  message = 'The story unfolds...',
 }: NarrativeLoadingProps) {
   const opacity = useSharedValue(0.4);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reduceMotion) {
+      opacity.value = 1;
+      return;
+    }
     opacity.value = withRepeat(
       withSequence(
         withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
@@ -30,7 +36,7 @@ export function NarrativeLoading({
       -1,
       false
     );
-  }, [opacity]);
+  }, [opacity, reduceMotion]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -57,8 +63,10 @@ export function NarrativeLoading({
 
 function AnimatedDot({ delay }: { delay: number }) {
   const translateY = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reduceMotion) return;
     translateY.value = withDelay(
       delay,
       withRepeat(
@@ -70,7 +78,7 @@ function AnimatedDot({ delay }: { delay: number }) {
         false
       )
     );
-  }, [delay, translateY]);
+  }, [delay, translateY, reduceMotion]);
 
   const style = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],

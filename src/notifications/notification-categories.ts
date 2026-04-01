@@ -1,5 +1,4 @@
 // Notification categories and message templates for DungeonMind
-// All messages are in pt-BR as per FR-030.
 
 import type { NotificationCategory } from '../types/entities';
 
@@ -40,23 +39,23 @@ export function buildNotificationContent(input: NotificationParams): {
   switch (input.category) {
     case 'turn_reminder':
       return {
-        title: 'Sua vez de jogar!',
-        body: `É a sua vez em '${input.params.campaignName}'!`,
+        title: 'Your turn to play!',
+        body: `It's your turn in '${input.params.campaignName}'!`,
         deepLinkScreen: 'session',
       };
 
     case 'session_summary':
       return {
-        title: 'Resumo da Sessão',
-        body: `O resumo da sua sessão em '${input.params.campaignName}' está pronto.`,
+        title: 'Session Summary',
+        body: `Your session summary for '${input.params.campaignName}' is ready.`,
         deepLinkScreen: 'history',
       };
 
     case 'campaign_nudge':
     case 'story_continuation':
       return {
-        title: 'A aventura espera...',
-        body: `${input.params.characterName} ainda espera em ${input.params.location}. Continuar a aventura?`,
+        title: 'The adventure awaits...',
+        body: `${input.params.characterName} still awaits in ${input.params.location}. Continue the adventure?`,
         deepLinkScreen: 'session',
       };
   }

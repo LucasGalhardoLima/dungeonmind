@@ -1,7 +1,7 @@
 // Assembles the 7-section system prompt for the AI DM Engine
 // Budget: ~12,500 input tokens total
 
-import type { Campaign, Character, Exchange, AdventureType, Difficulty } from '../types/entities';
+import type { Campaign, Character, Exchange, AdventureType, Difficulty, World } from '../types/entities';
 import type { StateDocument } from '../types/state-document';
 
 // ---------------------------------------------------------------------------
@@ -40,8 +40,25 @@ O que não pode existir aqui: ironia moderna, subversão cômica, tecnologia al�
 
 Identidade estética: Um mundo de ruínas majestosas e poder indomável — onde cada feitiço pode ser o último e cada coroa pode desmoronar amanhã.`;
 
-function buildWorldDefinition(): string {
-  return `[SEÇÃO 1 — DEFINIÇÃO DO MUNDO]\n${VALDRIS_WORLD_DEFINITION}`;
+const ASHENMOOR_WORLD_DEFINITION = `## Mundo: Ashenmoor (Horror Gótico)
+
+Regra fundamental: Uma maldição ancestral consome a terra. A nobreza de Ashenmoor fez um pacto com entidades além do véu há séculos — e o preço nunca foi pago. Agora a dívida cobra-se em carne, sanidade e alma. A magia existe, mas toda magia tem um custo grotesco: usar poder sobrenatural acelera a corrupção que devora o mundo.
+
+Tensão central: Os pântanos avançam sobre as vilas, os mortos não permanecem mortos, e os nobres trancados em suas mansões decadentes sabem mais do que revelam. Algo antigo desperta sob Ashenmoor — e cada noite é mais longa que a anterior.
+
+Arquétipos de NPCs: Aldeões paranóicos que desconfiam de forasteiros e guardam segredos terríveis. Aristocratas amaldiçoados que mantêm fachadas de civilidade enquanto apodrecem por dentro. Inquisidores zelosos que caçam bruxaria com fervor cego — e às vezes estão certos. Curandeiros de pântano que conhecem remédios proibidos. Cultistas sussurrantes que servem ao que dorme abaixo.
+
+O que não pode existir aqui: heróis invulneráveis, humor leve ou quebra de tensão cômica, tecnologia além de lamparina e pólvora primitiva, finais felizes sem sacrifício, esperança fácil. A luz aqui é sempre temporária.
+
+Identidade estética: Um mundo de mansões em ruínas, charnecas cobertas de névoa e vilas onde os sinos dobram por razões que ninguém explica — onde cada sombra esconde algo pior do que você imagina e a salvação sempre exige um preço.`;
+
+const WORLD_DEFINITIONS: Record<World, string> = {
+  valdris: VALDRIS_WORLD_DEFINITION,
+  ashenmoor: ASHENMOOR_WORLD_DEFINITION,
+};
+
+function buildWorldDefinition(world: World): string {
+  return `[SEÇÃO 1 — DEFINIÇÃO DO MUNDO]\n${WORLD_DEFINITIONS[world]}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -438,7 +455,7 @@ export function buildPrompt(input: PromptBuilderInput): AssembledPrompt {
 
   // --- System prompt: sections 1–5 ---
   const systemSections: string[] = [
-    buildWorldDefinition(),
+    buildWorldDefinition(campaign.world),
     buildAdventureTypeDefinition(campaign.adventure_type),
     buildDMPersona(campaign.mature_content, campaign.difficulty),
   ];

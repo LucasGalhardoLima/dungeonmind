@@ -13,7 +13,7 @@ interface SessionWithImages {
 }
 
 function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('pt-BR', {
+  return new Date(dateString).toLocaleDateString('en-US', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -32,7 +32,7 @@ function ChapterCard({
   return (
     <View style={styles.chapterCard}>
       <Text style={styles.chapterTitle}>
-        Capítulo {chapterNumber}
+        Chapter {chapterNumber}
       </Text>
       <Text style={styles.chapterDate}>
         {formatDate(session.started_at)}
@@ -41,7 +41,7 @@ function ChapterCard({
       {session.summary !== null ? (
         <Text style={styles.summaryText}>{session.summary}</Text>
       ) : (
-        <Text style={styles.noSummaryText}>Resumo não disponível</Text>
+        <Text style={styles.noSummaryText}>Summary not available</Text>
       )}
 
       {images.length > 0 ? (
@@ -89,7 +89,7 @@ export default function SessionHistory() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backButtonText}>{'\u2190'}</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Diário de Aventura</Text>
+        <Text style={styles.headerTitle}>Adventure Journal</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -100,12 +100,12 @@ export default function SessionHistory() {
       >
         {loading ? (
           <View style={styles.centered}>
-            <Text style={styles.loadingText}>Carregando...</Text>
+            <Text style={styles.loadingText}>Loading...</Text>
           </View>
         ) : sessionsWithImages.length === 0 ? (
           <View style={styles.centered}>
             <Text style={styles.emptyText}>
-              Sua história ainda não começou...
+              Your story has not yet begun...
             </Text>
           </View>
         ) : (

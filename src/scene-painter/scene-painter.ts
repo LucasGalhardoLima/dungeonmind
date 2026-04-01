@@ -1,4 +1,4 @@
-// Scene painter using Replicate API (SDXL + pixel-art-xl LoRA)
+// Scene painter via Supabase generate-image edge function (server-side Replicate proxy)
 
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Crypto from 'expo-crypto';
@@ -7,42 +7,17 @@ import type { ScenePrompt } from '../types/scene-prompt';
 import type { AdventureType, World } from '../types/entities';
 import { IMAGE_CONFIG, DEFAULT_NEGATIVE_PROMPT } from '../types/scene-prompt';
 
-const REPLICATE_API_KEY =
-  Constants.expoConfig?.extra?.EXPO_PUBLIC_REPLICATE_API_KEY ??
-  process.env['EXPO_PUBLIC_REPLICATE_API_KEY'] ??
+const SUPABASE_URL =
+  Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL ??
+  process.env['EXPO_PUBLIC_SUPABASE_URL'] ??
   '';
 
-const REPLICATE_API_URL = 'https://api.replicate.com/v1/predictions';
+const SUPABASE_ANON_KEY =
+  Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_KEY ??
+  process.env['EXPO_PUBLIC_SUPABASE_KEY'] ??
+  '';
 
-// stability-ai/sdxl latest version hash
-const SDXL_VERSION = '7762fd07cf82c948538e41f63f77d685e02b063e37e496e96eefd46c929f9bdc';
-const POLL_INTERVAL_MS = 1000;
-const TIMEOUT_MS = 60000;
-
-type PredictionStatus = 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled';
-
-interface ReplicatePrediction {
-  id: string;
-  status: PredictionStatus;
-  output: string[] | null;
-  error: string | null;
-}
-
-function isPredictionTerminal(status: PredictionStatus): boolean {
-  return status === 'succeeded' || status === 'failed' || status === 'canceled';
-}
-
-function isReplicatePrediction(value: unknown): value is ReplicatePrediction {
-  if (typeof value !== 'object' || value === null) return false;
-  const obj = value as Record<string, unknown>;
-  return (
-    typeof obj['id'] === 'string' &&
-    typeof obj['status'] === 'string' &&
-    ['starting', 'processing', 'succeeded', 'failed', 'canceled'].includes(
-      obj['status'] as string,
-    )
-  );
-}
+const GENERATE_IMAGE_URL = `${SUPABASE_URL}/functions/v1/generate-image`;
 
 export function buildSceneTextPrompt(prompt: ScenePrompt): string {
   const characters = prompt.characters.join(', ');
@@ -56,7 +31,7 @@ export function buildSceneTextPrompt(prompt: ScenePrompt): string {
   ].join(', ');
 }
 
-const ADVENTURE_BG_PROMPTS: Record<AdventureType, string> = {
+const VALDRIS_BG_PROMPTS: Record<AdventureType, string> = {
   dungeon_crawl:
     'pixel art scene, vast dark dungeon interior, stone corridors, flickering torches on walls, mysterious glowing runes, ancient stone pillars, cobwebs, atmospheric lighting, high fantasy, medieval architecture, torch lighting',
   wilderness_exploration:
@@ -67,8 +42,25 @@ const ADVENTURE_BG_PROMPTS: Record<AdventureType, string> = {
     'pixel art scene, dark cursed landscape, twisted dead trees, eerie fog, crumbling ruins, faint ghostly light, ominous sky, foreboding atmosphere, high fantasy, medieval architecture, torch lighting',
 };
 
-function buildAdventureBackgroundPrompt(_world: World, adventureType: AdventureType): string {
-  return ADVENTURE_BG_PROMPTS[adventureType];
+const ASHENMOOR_BG_PROMPTS: Record<AdventureType, string> = {
+  dungeon_crawl:
+    'pixel art scene, decrepit gothic catacombs, crumbling stone arches, dripping water, flickering candlelight, iron chains on walls, ancient coffins, rat bones scattered, muted grays, blood red accents, gothic horror atmosphere',
+  wilderness_exploration:
+    'pixel art scene, desolate moorland at dusk, twisted dead trees, thick rolling fog, distant ruined manor silhouette, overgrown gravestones, pale moonlight, withered heather, muted grays, amber candlelight glow, gothic horror landscape',
+  political_intrigue:
+    'pixel art scene, decaying aristocratic ballroom, faded velvet curtains, cracked chandeliers with dripping candles, dusty portraits with watching eyes, cobwebbed grand staircase, muted grays, blood red carpet, gothic horror opulence',
+  horror_survival:
+    'pixel art scene, cursed swamp village at night, crooked wooden houses, lanterns swaying in wind, thick fog rising from black water, gnarled roots, distant church bell tower, muted grays, amber candlelight, blood red moon, gothic horror atmosphere',
+};
+
+const WORLD_BG_PROMPTS: Record<World, Record<AdventureType, string>> = {
+  valdris: VALDRIS_BG_PROMPTS,
+  ashenmoor: ASHENMOOR_BG_PROMPTS,
+};
+
+function buildAdventureBackgroundPrompt(world: World, adventureType: AdventureType): string {
+  const worldPrompts = WORLD_BG_PROMPTS[world] ?? VALDRIS_BG_PROMPTS;
+  return worldPrompts[adventureType];
 }
 
 function delay(ms: number): Promise<void> {
@@ -92,85 +84,77 @@ async function ensureCacheDir(cacheDir: string): Promise<void> {
   }
 }
 
-async function createPrediction(
+interface GenerateImageResponse {
+  output: string[] | null;
+  error?: string;
+  status?: string;
+}
+
+function isGenerateImageResponse(value: unknown): value is GenerateImageResponse {
+  if (typeof value !== 'object' || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  return 'output' in obj || 'error' in obj;
+}
+
+async function generateViaEdgeFunction(
   textPrompt: string,
   negativePrompt: string,
-): Promise<ReplicatePrediction> {
+  seed?: number,
+): Promise<string[]> {
   const maxAttempts = 3;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const response = await fetch(REPLICATE_API_URL, {
+    const body: Record<string, unknown> = {
+      prompt: textPrompt,
+      negative_prompt: negativePrompt,
+      width: IMAGE_CONFIG.width,
+      height: IMAGE_CONFIG.height,
+      scheduler: IMAGE_CONFIG.scheduler,
+      num_inference_steps: IMAGE_CONFIG.num_inference_steps,
+      guidance_scale: IMAGE_CONFIG.guidance_scale,
+      num_outputs: IMAGE_CONFIG.num_outputs,
+    };
+    if (seed !== undefined) {
+      body.seed = seed;
+    }
+
+    const response = await fetch(GENERATE_IMAGE_URL, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${REPLICATE_API_KEY}`,
         'Content-Type': 'application/json',
-        Prefer: 'wait',
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
       },
-      body: JSON.stringify({
-        version: SDXL_VERSION,
-        input: {
-          prompt: textPrompt,
-          negative_prompt: negativePrompt,
-          width: IMAGE_CONFIG.width,
-          height: IMAGE_CONFIG.height,
-          scheduler: IMAGE_CONFIG.scheduler,
-          num_inference_steps: IMAGE_CONFIG.num_inference_steps,
-          guidance_scale: IMAGE_CONFIG.guidance_scale,
-          num_outputs: IMAGE_CONFIG.num_outputs,
-        },
-      }),
+      body: JSON.stringify(body),
     });
 
     if (response.status === 429 && attempt < maxAttempts - 1) {
-      // Rate limited — wait and retry
       await delay(10000 * (attempt + 1));
       continue;
     }
 
     if (!response.ok) {
-      throw new Error(`Replicate API returned ${String(response.status)}`);
+      const errBody: unknown = await response.json().catch(() => null);
+      const msg = isGenerateImageResponse(errBody) ? errBody.error : `status ${String(response.status)}`;
+      throw new Error(`Image generation failed: ${msg ?? 'unknown'}`);
     }
 
-    const body: unknown = await response.json();
-    if (!isReplicatePrediction(body)) {
-      throw new Error('Invalid prediction response from Replicate API');
+    const result: unknown = await response.json();
+    if (!isGenerateImageResponse(result)) {
+      throw new Error('Invalid response from generate-image edge function');
     }
 
-    return body;
+    if (result.error) {
+      throw new Error(`Image generation error: ${result.error}`);
+    }
+
+    if (!result.output || result.output.length === 0) {
+      throw new Error('Image generation succeeded but returned no output');
+    }
+
+    return result.output;
   }
 
-  throw new Error('Replicate API rate limited after retries');
-}
-
-async function pollPrediction(predictionId: string): Promise<ReplicatePrediction> {
-  const pollUrl = `${REPLICATE_API_URL}/${predictionId}`;
-  const startTime = Date.now();
-
-  while (Date.now() - startTime < TIMEOUT_MS) {
-    await delay(POLL_INTERVAL_MS);
-
-    const response = await fetch(pollUrl, {
-      headers: {
-        Authorization: `Bearer ${REPLICATE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Replicate poll returned ${String(response.status)}`);
-    }
-
-    const body: unknown = await response.json();
-    if (!isReplicatePrediction(body)) {
-      throw new Error('Invalid poll response from Replicate API');
-    }
-
-    if (isPredictionTerminal(body.status)) {
-      return body;
-    }
-  }
-
-  throw new Error('Scene generation timed out');
+  throw new Error('Image generation rate limited after retries');
 }
 
 async function downloadImage(remoteUrl: string, localPath: string): Promise<void> {
@@ -194,30 +178,14 @@ async function attemptGeneration(prompt: ScenePrompt, cacheDir: string): Promise
 
   await ensureCacheDir(cacheDir);
 
-  // Create prediction
-  let prediction = await createPrediction(textPrompt, prompt.negative_prompt);
+  // Generate via edge function (Replicate key stays server-side)
+  const output = await generateViaEdgeFunction(textPrompt, prompt.negative_prompt);
 
-  // Poll if not yet terminal
-  if (!isPredictionTerminal(prediction.status)) {
-    prediction = await pollPrediction(prediction.id);
-  }
-
-  // Validate result
-  if (prediction.status !== 'succeeded') {
-    const errorMsg = prediction.error ?? 'unknown error';
-    throw new Error(`Prediction ${prediction.status}: ${errorMsg}`);
-  }
-
-  if (!prediction.output || prediction.output.length === 0) {
-    throw new Error('Prediction succeeded but returned no output');
-  }
-
-  const imageUrl = prediction.output[0];
+  const imageUrl = output[0];
   if (typeof imageUrl !== 'string' || imageUrl.length === 0) {
-    throw new Error('Prediction output URL is invalid');
+    throw new Error('Image output URL is invalid');
   }
 
-  // Download to local storage
   await downloadImage(imageUrl, localPath);
 
   return localPath;
@@ -265,14 +233,8 @@ export async function generateAdventureBackground(
   await ensureCacheDir(cacheDir);
 
   try {
-    let prediction = await createPrediction(textPrompt, DEFAULT_NEGATIVE_PROMPT);
-    if (!isPredictionTerminal(prediction.status)) {
-      prediction = await pollPrediction(prediction.id);
-    }
-    if (prediction.status !== 'succeeded' || !prediction.output || prediction.output.length === 0) {
-      return null;
-    }
-    const imageUrl = prediction.output[0];
+    const output = await generateViaEdgeFunction(textPrompt, DEFAULT_NEGATIVE_PROMPT);
+    const imageUrl = output[0];
     if (typeof imageUrl !== 'string' || imageUrl.length === 0) return null;
     await downloadImage(imageUrl, localPath);
     return localPath;

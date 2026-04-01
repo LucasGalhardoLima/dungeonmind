@@ -33,7 +33,7 @@ export function HookCard({
       onPress={handlePress}
       entering={FadeInDown.delay(hookIndex * STAGGER_DELAY_MS).duration(400)}
       accessibilityRole="button"
-      accessibilityLabel={`Gancho ${displayNumber}: ${hookText}`}
+      accessibilityLabel={`Hook ${displayNumber}: ${hookText}`}
       accessibilityState={{ selected: isSelected }}
       style={{
         backgroundColor: SURFACE,
@@ -59,7 +59,7 @@ export function HookCard({
             }),
       }}
     >
-      {/* Badge com o número do gancho */}
+      {/* Badge with hook number */}
       <View
         style={{
           position: 'absolute',
@@ -86,7 +86,7 @@ export function HookCard({
         </Text>
       </View>
 
-      {/* Texto do gancho */}
+      {/* Hook text */}
       <Text
         style={{
           color: colors.text,

@@ -128,7 +128,7 @@ export function CharacterPortrait({
               lineHeight: 20,
             }}
           >
-            O artista está desenhando seu personagem...
+            The artist is drawing your character...
           </Text>
         </Animated.View>
         <View style={{ flexDirection: 'row', marginTop: 8, gap: 6 }}>
@@ -202,7 +202,7 @@ export function CharacterPortrait({
           fontFamily: typography.heading,
         }}
       >
-        Sem retrato
+        No portrait
       </Text>
     </View>
   );

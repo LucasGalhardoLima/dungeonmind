@@ -1,8 +1,11 @@
+import { useCallback, useMemo } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import type { ImageSource } from 'expo-image';
 import { WorldCard } from '../../../src/ui/WorldCard';
+import { getDatabase } from '../../../src/persistence/database';
+import { trackEvent } from '../../../src/analytics/analytics-service';
 import { colors } from '../../../src/ui/theme';
 
 interface World {
@@ -18,23 +21,31 @@ const WORLDS: readonly World[] = [
     id: 'valdris',
     name: 'Valdris',
     description:
-      'Os deuses estão mortos. Seu poder se fragmentou e espalhou pelo mundo há 400 anos. Cada reino foi construído sobre um fragmento — e os fragmentos estão desaparecendo.',
+      'The gods are dead. Their power shattered and scattered across the world 400 years ago. Each kingdom was built upon a fragment — and the fragments are vanishing.',
     image: require('../../../assets/images/worlds/valdris.png'),
+    isAvailable: true,
+  },
+  {
+    id: 'ashenmoor',
+    name: 'Ashenmoor',
+    description:
+      'An ancestral curse consumes the land. The nobility struck a pact with entities beyond the veil — and the price was never paid. The dead do not stay dead.',
+    image: require('../../../assets/images/worlds/ashenmoor.png'),
     isAvailable: true,
   },
   {
     id: 'ferrumclave',
     name: 'Ferrumclave',
     description:
-      'Autômatos desenvolveram consciência há 30 anos. Não têm direitos legais. A revolução industrial foi construída sobre seu trabalho.',
+      'Automatons developed consciousness 30 years ago. They have no legal rights. The industrial revolution was built on their labor.',
     image: require('../../../assets/images/worlds/ferrumclave.png'),
     isAvailable: false,
   },
   {
     id: 'vazio-entre-estrelas',
-    name: 'Vazio entre Estrelas',
+    name: 'Void Between Stars',
     description:
-      'Viagem interestelar existe mas leva gerações. Quem parte nunca retorna ao mesmo mundo que deixou.',
+      'Interstellar travel exists but takes generations. Those who leave never return to the same world they left behind.',
     image: require('../../../assets/images/worlds/vazio-entre-estrelas.png'),
     isAvailable: false,
   },
@@ -42,15 +53,15 @@ const WORLDS: readonly World[] = [
     id: 'thalassar',
     name: 'Thalassar',
     description:
-      'O oceano não tem fundo, e algo lá embaixo responde quando você desce fundo o suficiente.',
+      'The ocean has no bottom, and something down there answers when you descend deep enough.',
     image: require('../../../assets/images/worlds/thalassar.png'),
     isAvailable: false,
   },
   {
     id: 'cinzas-de-umbra',
-    name: 'Cinzas de Umbra',
+    name: 'Ashes of Umbra',
     description:
-      'A morte não é o fim, mas o que vem depois é pior. Os vivos e os mortos compartilham o mesmo espaço.',
+      'Death is not the end, but what comes after is worse. The living and the dead share the same space.',
     image: require('../../../assets/images/worlds/cinzas-de-umbra.png'),
     isAvailable: false,
   },
@@ -58,17 +69,20 @@ const WORLDS: readonly World[] = [
     id: 'kenhado',
     name: 'Kenhado',
     description:
-      'Espíritos e humanos viveram em equilíbrio por milênios através de um pacto sagrado. O pacto foi quebrado recentemente.',
+      'Spirits and humans lived in balance for millennia through a sacred pact. The pact was recently broken.',
     image: require('../../../assets/images/worlds/kenhado.png'),
     isAvailable: false,
   },
 ];
 
-function handleWorldSelect(id: string): void {
-  router.push({ pathname: '/(campaign)/new/adventure-type', params: { world: id } });
-}
-
 export default function WorldSelection() {
+  const db = useMemo(() => getDatabase(), []);
+
+  const handleWorldSelect = useCallback((id: string) => {
+    trackEvent(db, 'world_selected', { world: id });
+    router.push({ pathname: '/(campaign)/new/adventure-type', params: { world: id } });
+  }, [db]);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView
@@ -88,7 +102,7 @@ export default function WorldSelection() {
             marginBottom: 8,
           }}
         >
-          Escolha seu Mundo
+          Choose Your World
         </Text>
 
         <Text
@@ -99,7 +113,7 @@ export default function WorldSelection() {
             marginBottom: 32,
           }}
         >
-          Selecione o mundo onde sua aventura acontecerá
+          Select the world where your adventure will take place
         </Text>
 
         {WORLDS.map((world) => (

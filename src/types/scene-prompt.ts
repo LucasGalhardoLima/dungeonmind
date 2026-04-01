@@ -34,11 +34,31 @@ export const VALDRIS_STYLE_TOKENS = [
   'high_fantasy_palette',
 ];
 
+export const ASHENMOOR_STYLE_TOKENS = [
+  'ashenmoor_palette',
+  'gothic_architecture',
+  'candlelight_and_fog',
+  'muted_grays',
+  'blood_red_accents',
+  'decayed_grandeur',
+  'horror_atmosphere',
+  'moonlit_moors',
+];
+
 export const PORTRAIT_STYLE_TOKENS = [
   'pixel_art_portrait',
   'front_facing',
   'bust_shot',
   'valdris_aesthetic',
+];
+
+export const ASHENMOOR_PORTRAIT_STYLE_TOKENS = [
+  'pixel_art_portrait',
+  'front_facing',
+  'bust_shot',
+  'ashenmoor_aesthetic',
+  'pale_skin_tones',
+  'dark_shadows',
 ];
 
 export const IMAGE_CONFIG = {

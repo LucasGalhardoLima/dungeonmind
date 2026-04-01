@@ -151,7 +151,7 @@ export function DiceOverlay({
           <Pressable
             onPress={triggerRoll}
             accessibilityRole="button"
-            accessibilityLabel={`Rolar ${diceType.toUpperCase()}`}
+            accessibilityLabel={`Roll ${diceType.toUpperCase()}`}
             style={{
               marginTop: 20,
               paddingHorizontal: 32,
@@ -168,7 +168,7 @@ export function DiceOverlay({
                 fontWeight: '700',
               }}
             >
-              Rolar {diceType.toUpperCase()}
+              Roll {diceType.toUpperCase()}
             </Text>
           </Pressable>
         )}
@@ -183,7 +183,7 @@ export function DiceOverlay({
               textAlign: 'center',
             }}
           >
-            Esperando {partnerName ?? 'parceiro'} rolar...
+            Waiting for {partnerName ?? 'partner'} to roll...
           </Text>
         )}
 
@@ -195,7 +195,7 @@ export function DiceOverlay({
               marginTop: 12,
             }}
           >
-            Rolando...
+            Rolling...
           </Text>
         )}
 
@@ -203,7 +203,7 @@ export function DiceOverlay({
           <Text
             accessibilityRole="text"
             accessibilityLiveRegion="polite"
-            accessibilityLabel={`Resultado: ${String(result)}`}
+            accessibilityLabel={`Result: ${String(result)}`}
             style={{
               color: colors.text,
               fontSize: 32,
@@ -231,7 +231,7 @@ export function DiceOverlay({
         >
           <Text
             accessibilityLiveRegion="assertive"
-            accessibilityLabel="Acerto Crítico! Resultado: 20"
+            accessibilityLabel="Critical Hit! Result: 20"
             style={{
               color: colors.accent,
               fontSize: 64,
@@ -249,7 +249,7 @@ export function DiceOverlay({
               marginTop: 8,
             }}
           >
-            ACERTO CRÍTICO
+            CRITICAL HIT
           </Text>
         </Animated.View>
       )}
@@ -268,7 +268,7 @@ export function DiceOverlay({
         >
           <Text
             accessibilityLiveRegion="assertive"
-            accessibilityLabel="Falha Crítica! Resultado: 1"
+            accessibilityLabel="Critical Failure! Result: 1"
             style={{
               color: colors.danger,
               fontSize: 64,
@@ -286,7 +286,7 @@ export function DiceOverlay({
               marginTop: 8,
             }}
           >
-            FALHA CRÍTICA
+            CRITICAL FAILURE
           </Text>
         </Animated.View>
       )}

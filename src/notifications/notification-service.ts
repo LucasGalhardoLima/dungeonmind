@@ -22,7 +22,7 @@ const MAX_NOTIFICATIONS_PER_DAY = 3;
  */
 export async function requestNotificationPermission(): Promise<boolean> {
   if (Platform.OS === 'web') {
-    console.warn('[notifications] Notifications are not supported on web');
+    if (__DEV__) console.warn('[notifications] Notifications are not supported on web');
     return false;
   }
 
@@ -50,7 +50,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
       (Constants.expoConfig?.extra?.['eas'] as Record<string, string> | undefined)?.['projectId'] ??
       null;
     if (!projectId) {
-      console.warn('[notifications] No EAS project ID configured');
+      if (__DEV__) console.warn('[notifications] No EAS project ID configured');
       return null;
     }
 
@@ -60,7 +60,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
     return tokenResponse.data;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    console.warn('[notifications] Push token registration failed:', message);
+    if (__DEV__) console.warn('[notifications] Push token registration failed:', message);
     return null;
   }
 }
@@ -71,26 +71,26 @@ export async function setupNotificationChannels(): Promise<void> {
   if (Platform.OS !== 'android') return;
 
   await Notifications.setNotificationChannelAsync('turn_reminder', {
-    name: 'Lembretes de Turno',
+    name: 'Turn Reminders',
     importance: Notifications.AndroidImportance.HIGH,
     vibrationPattern: [0, 250, 250, 250],
     sound: 'default',
   });
 
   await Notifications.setNotificationChannelAsync('session_summary', {
-    name: 'Resumos de Sessão',
+    name: 'Session Summaries',
     importance: Notifications.AndroidImportance.DEFAULT,
     sound: 'default',
   });
 
   await Notifications.setNotificationChannelAsync('story_continuation', {
-    name: 'Continuação de Aventura',
+    name: 'Adventure Continuation',
     importance: Notifications.AndroidImportance.LOW,
     sound: 'default',
   });
 
   await Notifications.setNotificationChannelAsync('campaign_nudge', {
-    name: 'Lembrete de Campanha',
+    name: 'Campaign Reminder',
     importance: Notifications.AndroidImportance.DEFAULT,
     sound: 'default',
   });
@@ -167,7 +167,7 @@ export async function scheduleLocalNotification(
     return notificationId;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    console.warn('[notifications] Scheduling failed:', message);
+    if (__DEV__) console.warn('[notifications] Scheduling failed:', message);
     return null;
   }
 }
@@ -208,7 +208,7 @@ export async function cancelAllCampaignNotifications(
     }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    console.warn('[notifications] Cancel failed:', message);
+    if (__DEV__) console.warn('[notifications] Cancel failed:', message);
   }
 }
 
@@ -275,7 +275,7 @@ export async function checkAndScheduleInactivityNudges(
     if (!characterName) continue;
 
     // Parse location from state document
-    let location = 'um lugar esquecido';
+    let location = 'a forgotten place';
     try {
       const stateDoc = JSON.parse(campaign.state_document) as {
         world_state?: { location?: string };

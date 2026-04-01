@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -23,12 +23,20 @@ import { detectShaderType } from '../../../src/scene-painter/shader-animations';
 
 import { NarrationBubble } from '../../../src/ui/NarrationBubble';
 import { NarrativeLoading } from '../../../src/ui/NarrativeLoading';
+import { NarrativeErrorBubble } from '../../../src/ui/NarrativeErrorBubble';
 import { ActionButtons } from '../../../src/ui/ActionButtons';
 import { DiceOverlay } from '../../../src/ui/DiceOverlay';
 import { DeathSaveOverlay } from '../../../src/ui/DeathSaveOverlay';
+import { InitiativeTracker } from '../../../src/ui/InitiativeTracker';
+import { CombatLog } from '../../../src/ui/CombatLog';
+import { SpellSlotTracker } from '../../../src/ui/SpellSlotTracker';
 import { AtmosphericBackground } from '../../../src/ui/AtmosphericBackground';
+import { OfflineFallback } from '../../../src/ui/OfflineFallback';
 import { useMultiplayerStore } from '../../../src/store/multiplayer-store';
+import { useCombatStore } from '../../../src/store/combat-store';
 import { useRepository } from '../../../src/persistence/hooks/use-repository';
+import { useNetworkStatus } from '../../../src/engine/hooks/use-network-status';
+import { PerformanceOverlay } from '../../../src/ui/PerformanceOverlay';
 import { colors, spacing, typography } from '../../../src/ui/theme';
 
 import type { ImageSource } from 'expo-image';
@@ -66,6 +74,7 @@ export default function SessionScreen() {
   // Engine hooks
   const {
     sendPlayerAction,
+    retryLastAction,
     submitDiceResult,
     streamingText,
     isStreaming,
@@ -74,6 +83,9 @@ export default function SessionScreen() {
     error,
   } = useDMEngine();
 
+  // Network status
+  const { isOnline } = useNetworkStatus();
+
   // Multiplayer state
   const isMultiplayer = useMultiplayerStore((s) => s.connectionState === 'connected');
 
@@ -81,7 +93,15 @@ export default function SessionScreen() {
   const recentExchanges = useSessionStore((s) => s.recentExchanges);
   const selectedCampaign = useCampaignStore((s) => s.getSelectedCampaign());
 
-  // Repositories for recap
+  // Combat state
+  const inCombat = useCombatStore((s) => s.inCombat);
+  const combatRound = useCombatStore((s) => s.round);
+  const combatParticipants = useCombatStore((s) => s.participants);
+  const combatLog = useCombatStore((s) => s.log);
+  const combatLogExpanded = useCombatStore((s) => s.combatLogExpanded);
+  const setCombatLogExpanded = useCombatStore((s) => s.setCombatLogExpanded);
+
+  // Repositories for recap and character data
   const repos = useRepository();
 
   // Session recap — load the latest recap on mount
@@ -91,6 +111,13 @@ export default function SessionScreen() {
     if (!selectedCampaign) return;
     const recap = repos.sessionRecaps.getLatestByCampaignId(selectedCampaign.id);
     if (recap) setSessionRecap(recap.recap_text);
+  }, [selectedCampaign, repos]);
+
+  // Character data for spell slot display during combat
+  const character = useMemo(() => {
+    if (!selectedCampaign) return null;
+    const characters = repos.characters.getByCampaignId(selectedCampaign.id);
+    return characters[0] ?? null;
   }, [selectedCampaign, repos]);
 
   // Death save state from session store
@@ -104,23 +131,52 @@ export default function SessionScreen() {
     ? WORLD_COVER_IMAGES[selectedCampaign.world]
     : undefined;
 
-  // Derive shader type from latest DM content for subtle atmosphere
-  const latestDMContent = recentExchanges.filter(e => e.role === 'dm').at(-1)?.content ?? '';
-  const shaderType = detectShaderType(streamingText || latestDMContent, '');
+  // Memoize shader type detection — only recalculate when exchanges or streaming text change
+  const shaderType = useMemo(() => {
+    const latestDMContent = recentExchanges.filter(e => e.role === 'dm').at(-1)?.content ?? '';
+    return detectShaderType(streamingText || latestDMContent, '');
+  }, [recentExchanges, streamingText]);
 
-  // Map exchanges to display format
-  const displayExchanges: DisplayExchange[] = recentExchanges.map(mapExchangeToDisplay);
+  // Memoize exchange mapping to avoid re-creating array on every render
+  const displayExchanges = useMemo(
+    () => recentExchanges.map(mapExchangeToDisplay),
+    [recentExchanges],
+  );
 
-  // Auto-scroll to bottom when exchanges change or streaming text updates
+  // Auto-scroll: track whether the user is near the bottom of the scroll view
+  const isNearBottomRef = useRef(true);
+  const contentHeightRef = useRef(0);
+  const scrollViewHeightRef = useRef(0);
+
+  const handleScroll = useCallback(
+    (e: { nativeEvent: { contentOffset: { y: number }; layoutMeasurement: { height: number }; contentSize: { height: number } } }) => {
+      const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+      const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+      isNearBottomRef.current = distanceFromBottom < 80;
+    },
+    [],
+  );
+
   const scrollToBottom = useCallback(() => {
-    scrollViewRef.current?.scrollToEnd({ animated: true });
+    if (isNearBottomRef.current) {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }
   }, []);
 
+  // Force-scroll on new exchanges (new message from player or DM)
+  const prevExchangeCountRef = useRef(displayExchanges.length);
   useEffect(() => {
-    // Small delay to allow layout to settle before scrolling
-    const timeout = setTimeout(scrollToBottom, 100);
-    return () => clearTimeout(timeout);
-  }, [displayExchanges.length, scrollToBottom]);
+    if (displayExchanges.length > prevExchangeCountRef.current) {
+      // New message arrived — always scroll down regardless of position
+      isNearBottomRef.current = true;
+      const timeout = setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 50);
+      prevExchangeCountRef.current = displayExchanges.length;
+      return () => clearTimeout(timeout);
+    }
+    prevExchangeCountRef.current = displayExchanges.length;
+  }, [displayExchanges.length]);
 
   // Handle sending player action
   const handleSend = useCallback(() => {
@@ -152,6 +208,11 @@ export default function SessionScreen() {
     [submitDiceResult],
   );
 
+  // Toggle combat log
+  const handleToggleCombatLog = useCallback(() => {
+    setCombatLogExpanded(!combatLogExpanded);
+  }, [combatLogExpanded, setCombatLogExpanded]);
+
   // Navigate to character sheet
   const handleCharacterSheet = useCallback(() => {
     if (!selectedCampaign) return;
@@ -173,17 +234,25 @@ export default function SessionScreen() {
         {/* Compact header with campaign name + character sheet button */}
         <View style={styles.sessionHeader}>
           <Text style={styles.campaignName} numberOfLines={1}>
-            {selectedCampaign?.name ?? 'Aventura'}
+            {selectedCampaign?.name ?? 'Adventure'}
           </Text>
           <Pressable
             style={styles.characterSheetButton}
             onPress={handleCharacterSheet}
             accessibilityRole="button"
-            accessibilityLabel="Ficha do personagem"
+            accessibilityLabel="Character Sheet"
           >
             <Text style={styles.characterSheetIcon}>{'\uD83D\uDCCB'}</Text>
           </Pressable>
         </View>
+
+        {/* Initiative tracker during combat */}
+        {inCombat && (
+          <InitiativeTracker
+            participants={combatParticipants}
+            round={combatRound}
+          />
+        )}
 
         {/* Scrollable narration area */}
         <ScrollView
@@ -196,7 +265,7 @@ export default function SessionScreen() {
         >
           {sessionRecap !== null && (
             <View style={styles.recapCard}>
-              <Text style={styles.recapTitle}>Anteriormente...</Text>
+              <Text style={styles.recapTitle}>Previously...</Text>
               <Text style={styles.recapText}>{sessionRecap}</Text>
             </View>
           )}
@@ -237,7 +306,7 @@ export default function SessionScreen() {
           {/* Narrador pondera — before first visible tokens arrive */}
           {isStreaming && stripMetadataForDisplay(streamingText).length === 0 && (
             <View style={styles.loadingContainer}>
-              <NarrativeLoading message="O narrador pondera..." />
+              <NarrativeLoading message="The Narrator ponders..." />
             </View>
           )}
 
@@ -252,15 +321,30 @@ export default function SessionScreen() {
             </View>
           )}
 
-          {/* Error display */}
+          {/* Error display with retry */}
           {error !== null && (
-            <View style={styles.errorRow}>
-              <Text style={styles.errorText}>
-                {error.narrative || 'Ocorreu um erro na narrativa.'}
-              </Text>
-            </View>
+            <NarrativeErrorBubble
+              message={error.narrative || 'The spirits are restless... tap to try again.'}
+              onRetry={retryLastAction}
+            />
           )}
         </ScrollView>
+
+        {/* Combat log + spell slots during combat */}
+        {inCombat && (
+          <>
+            {character?.spell_slots && (
+              <View style={styles.spellSlotRow}>
+                <SpellSlotTracker spellSlots={character.spell_slots} />
+              </View>
+            )}
+            <CombatLog
+              entries={combatLog}
+              expanded={combatLogExpanded}
+              onToggleExpanded={handleToggleCombatLog}
+            />
+          </>
+        )}
 
         {/* Unified bottom dock: actions + input */}
         <View style={styles.bottomDock}>
@@ -293,7 +377,7 @@ export default function SessionScreen() {
             )}
             <TextInput
               style={styles.textInput}
-              placeholder="O que você faz?"
+              placeholder="What do you do?"
               placeholderTextColor={colors.muted}
               value={inputText}
               onChangeText={setInputText}
@@ -313,7 +397,7 @@ export default function SessionScreen() {
               disabled={isStreaming || inputText.trim().length === 0}
               activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel="Enviar ação"
+              accessibilityLabel="Send action"
             >
               <Ionicons
                 name="send"
@@ -328,6 +412,19 @@ export default function SessionScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Dev performance overlay — triple-tap top-right to toggle */}
+      <PerformanceOverlay exchangeCount={displayExchanges.length} />
+
+      {/* Offline fallback overlay */}
+      <OfflineFallback
+        isOffline={!isOnline}
+        lastSessionSummary={sessionRecap}
+        onRetry={() => {
+          // Trigger a re-probe by toggling a lightweight state change;
+          // the hook re-probes automatically on app foregrounding.
+        }}
+      />
 
       {/* Death save overlay */}
       {deathSaveState.active && (
@@ -427,16 +524,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
   },
-  errorRow: {
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-  },
-  errorText: {
-    color: colors.danger,
-    fontSize: 14,
-    textAlign: 'center',
-  },
   bottomDock: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
@@ -503,5 +590,10 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontFamily: typography.body,
     fontStyle: 'italic',
+  },
+  spellSlotRow: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: 'rgba(26, 26, 46, 0.92)',
   },
 });

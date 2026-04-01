@@ -15,7 +15,7 @@ export type NotificationCategory =
   | 'session_summary'
   | 'campaign_nudge'
   | 'story_continuation';
-export type World = 'valdris';
+export type World = 'valdris' | 'ashenmoor';
 export type AdventureType =
   | 'dungeon_crawl'
   | 'wilderness_exploration'
@@ -29,6 +29,8 @@ export interface Player {
   mature_content_enabled: boolean;
   difficulty_preference: Difficulty;
   notification_preferences: Record<string, boolean>;
+  onboarding_completed: boolean;
+  analytics_opt_out: boolean;
   created_at: string;
   updated_at: string;
 }

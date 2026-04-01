@@ -16,7 +16,13 @@ import { useCampaignStore } from '../src/store/campaign-store';
 import { useSettingsStore } from '../src/store/settings-store';
 import { NarrativeLoading } from '../src/ui/NarrativeLoading';
 import { OfflineFallback } from '../src/ui/OfflineFallback';
+import { FeedbackModal } from '../src/feedback/FeedbackModal';
+import { useShakeToReport } from '../src/feedback/use-shake-to-report';
+import { initCrashReporting, setSentryUser } from '../src/feedback/sentry';
+import { trackEvent } from '../src/analytics/analytics-service';
 import { colors } from '../src/ui/theme';
+
+initCrashReporting();
 
 SplashScreen.preventAutoHideAsync();
 
@@ -67,6 +73,8 @@ export default function RootLayout() {
   const hydrateCampaigns = useCampaignStore((s) => s.hydrate);
   const campaignsLoaded = useCampaignStore((s) => s.isLoaded);
 
+  useShakeToReport(appReady);
+
   useEffect(() => {
     hydrateSettings(db);
   }, [db, hydrateSettings]);
@@ -75,6 +83,7 @@ export default function RootLayout() {
     const id = playerId();
     if (settingsLoaded && id) {
       hydrateCampaigns(repos, id);
+      setSentryUser(id);
     }
   }, [settingsLoaded, playerId, repos, hydrateCampaigns]);
 
@@ -82,8 +91,9 @@ export default function RootLayout() {
     if (fontsLoaded && settingsLoaded && campaignsLoaded) {
       setAppReady(true);
       SplashScreen.hideAsync();
+      trackEvent(db, 'app_open');
     }
-  }, [fontsLoaded, settingsLoaded, campaignsLoaded]);
+  }, [fontsLoaded, settingsLoaded, campaignsLoaded, db]);
 
   if (!appReady) {
     return (
@@ -108,6 +118,7 @@ export default function RootLayout() {
               animation: 'fade',
             }}
           >
+            <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
             <Stack.Screen name="(campaign)" options={{ animation: 'fade' }} />
             <Stack.Screen
               name="settings"
@@ -121,6 +132,7 @@ export default function RootLayout() {
             isOffline={isOffline}
             onRetry={checkConnectivity}
           />
+          <FeedbackModal />
         </RepositoryContext.Provider>
       </QueryClientProvider>
     </GestureHandlerRootView>
