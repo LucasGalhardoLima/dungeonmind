@@ -19,6 +19,7 @@ import { applyShortRest, applyLongRest } from '../mechanics/rest-recovery';
 import { castSpell, recoverAllSpellSlots } from '../mechanics/spell-slots';
 import { recoverClassAbilities } from '../mechanics/class-abilities';
 import { classifyNPCTier, getInteractionBudget } from '../mechanics/npc-tiering';
+import { useCombatTracker } from './use-combat-tracker';
 import {
   scheduleLocalNotification,
   generateDeepLink,
@@ -61,6 +62,9 @@ export function useDMEngine(): UseDMEngineReturn {
   const addExchange = useSessionStore((s) => s.addExchange);
 
   const selectedCampaign = useCampaignStore((s) => s.getSelectedCampaign());
+
+  // Combat tracker integration
+  const { processResponse: processCombatResponse } = useCombatTracker();
 
   // Token throttle buffer: accumulate tokens and flush at ~30fps
   const tokenBufferRef = useRef('');
@@ -383,6 +387,9 @@ export function useDMEngine(): UseDMEngineReturn {
 
             repos.campaigns.touchLastPlayed(selectedCampaign.id);
 
+            // Process combat state updates (initiative, log, round tracking)
+            processCombatResponse(response, character);
+
             // 4. Set isStreaming false LAST — streaming bubble disappears
             setIsStreaming(false);
           },
@@ -416,6 +423,7 @@ export function useDMEngine(): UseDMEngineReturn {
       addExchange,
       startTokenFlush,
       stopTokenFlush,
+      processCombatResponse,
     ]
   );
 
